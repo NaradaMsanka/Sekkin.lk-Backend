@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cosmetic-postgres
+    environment:
+      POSTGRES_DB: cosmetic_db
+      POSTGRES_USER: cosmetic_user
+      POSTGRES_PASSWORD: cosmetic_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
