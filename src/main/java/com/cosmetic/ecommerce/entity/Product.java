@@ -38,4 +38,7 @@ public class Product {
     private String ingredients;
 
     private String status;
+    @ManyToOne
+    @JoinColumn(name = "category_id")
+    private Category category;
 }

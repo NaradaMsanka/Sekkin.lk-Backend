@@ -28,4 +28,23 @@ public class ProductService {
         return productRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Product not found with id: " + id));
     }
+    //u[date and delete product
+    public Product updateProduct(Long id, Product updatedProduct) {
+        Product existing = getProductById(id);
+        existing.setName(updatedProduct.getName());
+        existing.setDescription(updatedProduct.getDescription());
+        existing.setPrice(updatedProduct.getPrice());
+        existing.setDiscountPrice(updatedProduct.getDiscountPrice());
+        existing.setBrand(updatedProduct.getBrand());
+        existing.setStockQuantity(updatedProduct.getStockQuantity());
+        existing.setSkinType(updatedProduct.getSkinType());
+        existing.setIngredients(updatedProduct.getIngredients());
+        existing.setStatus(updatedProduct.getStatus());
+        return productRepository.save(existing);
+    }
+
+    public void deleteProduct(Long id) {
+        Product product = getProductById(id);
+        productRepository.delete(product);
+    }
 }
