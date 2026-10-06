@@ -4,7 +4,6 @@ import com.cosmetic.ecommerce.dto.ProductDTO;
 import com.cosmetic.ecommerce.entity.Product;
 import com.cosmetic.ecommerce.service.ProductService;
 import jakarta.validation.Valid;
-// අලුතෙන් එකතු කළ Import එක
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -28,10 +27,21 @@ public class ProductController {
         return productService.createProduct(product);
     }
 
-    // GET Request - (හැමෝටම Products බලන්න පුළුවන්)
+    // GET Request - (Products ඔක්කොම බලන්න සහ Filter කරන්න)
     @GetMapping
-    public List<Product> getAllProducts() {
-        return productService.getAllProducts();
+    public List<Product> getAllProducts(
+            @RequestParam(required = false) String brand,
+            @RequestParam(required = false) String skinType,
+            @RequestParam(required = false) Double minPrice,
+            @RequestParam(required = false) Double maxPrice) {
+
+        // ෆිල්ටර් මුකුත් එවලා නැත්නම්, ඔක්කොම Products යවනවා
+        if (brand == null && skinType == null && minPrice == null && maxPrice == null) {
+            return productService.getAllProducts();
+        }
+
+        // ෆිල්ටර් එවලා තියෙනවා නම්, ඒවට ගැලපෙන ටික විතරක් යවනවා
+        return productService.filterProducts(brand, skinType, minPrice, maxPrice);
     }
 
     // request product using ID - (හැමෝටම Products බලන්න පුළුවන්)

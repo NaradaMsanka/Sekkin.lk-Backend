@@ -47,4 +47,8 @@ public class ProductService {
         Product product = getProductById(id);
         productRepository.delete(product);
     }
+
+    public List<Product> filterProducts(String brand, String skinType, Double minPrice, Double maxPrice) {
+        return productRepository.searchAndFilterProducts(brand, skinType, minPrice, maxPrice);
+    }
 }
