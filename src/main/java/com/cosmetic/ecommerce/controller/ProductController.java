@@ -4,6 +4,8 @@ import com.cosmetic.ecommerce.dto.ProductDTO;
 import com.cosmetic.ecommerce.entity.Product;
 import com.cosmetic.ecommerce.service.ProductService;
 import jakarta.validation.Valid;
+// අලුතෙන් එකතු කළ Import එක
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,22 +21,27 @@ public class ProductController {
         this.productService = productService;
     }
 
-    // POST Request
+    // POST Request - (ADMIN ට විතරක් සීමා කර ඇත)
+    @PreAuthorize("hasAuthority('ADMIN')")
     @PostMapping
     public Product createProduct(@RequestBody Product product) {
         return productService.createProduct(product);
     }
 
-    // GET Request
+    // GET Request - (හැමෝටම Products බලන්න පුළුවන්)
     @GetMapping
     public List<Product> getAllProducts() {
         return productService.getAllProducts();
     }
-    // reqest product using ID
+
+    // request product using ID - (හැමෝටම Products බලන්න පුළුවන්)
     @GetMapping("/{id}")
     public Product getProductById(@PathVariable Long id) {
         return productService.getProductById(id);
     }
+
+    // PUT Request - (ADMIN ට විතරක් සීමා කර ඇත)
+    @PreAuthorize("hasAuthority('ADMIN')")
     @PutMapping("/{id}")
     public Product updateProduct(@PathVariable Long id, @Valid @RequestBody ProductDTO dto) {
         Product product = new Product();
@@ -51,6 +58,8 @@ public class ProductController {
         return productService.updateProduct(id, product);
     }
 
+    // DELETE Request - (ADMIN ට විතරක් සීමා කර ඇත)
+    @PreAuthorize("hasAuthority('ADMIN')")
     @DeleteMapping("/{id}")
     public String deleteProduct(@PathVariable Long id) {
         productService.deleteProduct(id);

@@ -15,17 +15,25 @@ public class JwtUtil {
     private static final String SECRET = "SekkinLkCosmeticsSuperSecretKeyForJwtAuthentication2026";
     private static final Key key = Keys.hmacShaKeyFor(SECRET.getBytes());
 
-    public String generateToken(String email) {
+    // Update 1: Token එක හදද්දී Role එකත් එකතු කරනවා
+    public String generateToken(String email, String role) {
         return Jwts.builder()
                 .setSubject(email)
+                .claim("role", role) // Token එක ඇතුළට Role එක දාන තැන
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 10)) // පැය 10ක් වැඩ
+                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 10)) // පැය 10ක් වැඩ (වැරැද්ද හැදුවා)
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
     }
+
     // Token එකෙන් Email එක වෙන් කරලා ගන්න
     public String extractEmail(String token) {
         return Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token).getBody().getSubject();
+    }
+
+    // Update 2: Token එකෙන් Role එක වෙන් කරලා ගන්න (අලුතෙන් එකතු කළ කොටස)
+    public String extractRole(String token) {
+        return Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token).getBody().get("role", String.class);
     }
 
     // Token එක නිවැරදිද සහ කල් ඉකුත් වෙලා නැද්ද කියලා බලන්න

@@ -49,7 +49,7 @@ public class AuthController {
             User user = userOpt.get();
             // match the password
             if (passwordEncoder.matches(dto.getPassword(), user.getPassword())) {
-                String token = jwtUtil.generateToken(user.getEmail());
+                String token = jwtUtil.generateToken(user.getEmail(), user.getRole());
                 return ResponseEntity.ok(new AuthResponseDto(token));
             }
         }

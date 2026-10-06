@@ -10,6 +10,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import java.util.Collections;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -30,8 +32,12 @@ public class JwtFilter extends OncePerRequestFilter {
 
             if (jwtUtil.validateToken(token)) {
                 String email = jwtUtil.extractEmail(token);
-                // Token එක හරි නම්, Spring Security එකට කියනවා "මේ යූසර්ට ඇතුළට යන්න දෙන්න" කියලා
-                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(email, null, new ArrayList<>());
+                String role = jwtUtil.extractRole(token); // Token එකෙන් Role එක ගන්නවා
+
+                // User ගේ Role එක Spring Security එකට තේරෙන විදිහට හදනවා
+                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                        email, null, Collections.singletonList(new SimpleGrantedAuthority(role)));
+
                 SecurityContextHolder.getContext().setAuthentication(authToken);
             }
         }
