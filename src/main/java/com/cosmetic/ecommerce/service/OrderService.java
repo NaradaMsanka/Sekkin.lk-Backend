@@ -6,6 +6,8 @@ import com.cosmetic.ecommerce.repository.ProductRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Service
 public class OrderService {
 
@@ -59,5 +61,21 @@ public class OrderService {
         cartService.clearCart(email); // Order එක සාර්ථක නිසා Cart එක හිස් කරනවා
 
         return savedOrder;
+    }
+    // 1. User ගේ සියලුම Orders බැලීම
+    public List<Order> getUserOrders(String email) {
+        return orderRepository.findByUserEmail(email);
+    }
+
+    // 2. එක Order එකක් පමණක් තෝරා බැලීම
+    public Order getOrderById(Long orderId, String email) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+
+        // වෙනත් අයගේ Orders බලන්න බැරි වෙන්න Security Check එකක්
+        if (!order.getUser().getEmail().equals(email)) {
+            throw new RuntimeException("Unauthorized to view this order");
+        }
+        return order;
     }
 }
