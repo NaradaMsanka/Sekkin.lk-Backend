@@ -78,4 +78,12 @@ public class OrderService {
         }
         return order;
     }
+    // Admin සඳහා Order Status එක වෙනස් කිරීම
+    public Order updateOrderStatus(Long orderId, String newStatus) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+
+        order.setStatus(newStatus.toUpperCase()); // "SHIPPED", "DELIVERED" ලෙස ලොකු අකුරින් Save වීමට
+        return orderRepository.save(order);
+    }
 }

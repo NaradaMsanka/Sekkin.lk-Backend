@@ -6,7 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
-
+import org.springframework.security.access.prepost.PreAuthorize;
 @RestController
 @RequestMapping("/api/orders")
 public class OrderController {
@@ -39,5 +39,15 @@ public class OrderController {
     public ResponseEntity<Order> getOrderById(@PathVariable Long id) {
         String email = getLoggedInUserEmail();
         return ResponseEntity.ok(orderService.getOrderById(id, email));
+    }
+    // PATCH /api/orders/{id}/status (Admin පමණයි)
+    @PatchMapping("/{id}/status")
+    @PreAuthorize("hasRole('ADMIN')") // මෙයින් මෙම කොටස Admin ලාට පමණක් සීමා කරයි
+    public ResponseEntity<Order> updateOrderStatus(
+            @PathVariable Long id,
+            @RequestParam String status) {
+
+        Order updatedOrder = orderService.updateOrderStatus(id, status);
+        return ResponseEntity.ok(updatedOrder);
     }
 }
