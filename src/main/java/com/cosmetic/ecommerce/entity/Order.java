@@ -1,5 +1,6 @@
 package com.cosmetic.ecommerce.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore; // අලුතින් එකතු කළ import එක
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -16,6 +17,7 @@ public class Order {
     // ඇණවුම දැමූ පුද්ගලයා
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
+    @JsonIgnore // මෙන්න මෙය එකතු කළා (Jackson මඟින් Proxy error එක මඟහරී)
     private User user;
 
     // භාණ්ඩ යැවිය යුතු ලිපිනය (Address එක මෙතන තියෙනවා)

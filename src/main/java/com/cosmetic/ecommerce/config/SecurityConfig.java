@@ -33,7 +33,8 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .cors(Customizer.withDefaults()) // අලුතින් එකතු කළ කොටස: CORS අනුමත කිරීම
+                // CORS configuration එක මෙහිදී නිවැරදිව Bind කර ඇත
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll() // Login/Register වෙන්න Token ඕනේ නැහැ
@@ -45,7 +46,6 @@ public class SecurityConfig {
         return http.build();
     }
 
-    // අලුතින් එකතු කළ කොටස: React (localhost:5173) වෙතින් එන Requests වලට අවසර දීම
     @Bean
     public UrlBasedCorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
