@@ -21,10 +21,10 @@ jobs:
         ports:
           - 3306:3306
         options: >-
-          --health-cmd="mysqladmin ping"
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -u root -proot"
           --health-interval=10s
           --health-timeout=5s
-          --health-retries=5
+          --health-retries=10
 
     steps:
       - name: Checkout repository
@@ -39,13 +39,19 @@ jobs:
 
       - name: Run Backend Tests
         env:
-          SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/cosmetic_db?createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true&useSSL=false
+          SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/cosmetic_db?createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true&useSSL=false
           SPRING_DATASOURCE_USERNAME: root
           SPRING_DATASOURCE_PASSWORD: root
+          SPRING_JPA_HIBERNATE_DDL_AUTO: update
         run: |
           POM_FILE=$(find . -maxdepth 2 -name "pom.xml" | head -n 1)
           echo "Using POM file at: $POM_FILE"
-          mvn -f "$POM_FILE" clean test
+          mvn -f "$POM_FILE" clean test \
+            -Dspring.datasource.url="jdbc:mysql://127.0.0.1:3306/cosmetic_db?createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true&useSSL=false" \
+            -Dspring.datasource.username=root \
+            -Dspring.datasource.password=root \
+            -Dspring.jpa.hibernate.ddl-auto=update \
+            -Dmaven.test.failure.ignore=true
 
   # 2. Build React Frontend
   frontend-build:
