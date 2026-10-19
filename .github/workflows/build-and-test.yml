@@ -42,7 +42,10 @@ jobs:
           SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/cosmetic_db?createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true&useSSL=false
           SPRING_DATASOURCE_USERNAME: root
           SPRING_DATASOURCE_PASSWORD: root
-        run: mvn -f Backend/pom.xml clean test
+        run: |
+          POM_FILE=$(find . -maxdepth 2 -name "pom.xml" | head -n 1)
+          echo "Using POM file at: $POM_FILE"
+          mvn -f "$POM_FILE" clean test
 
   # 2. Build React Frontend
   frontend-build:
@@ -61,9 +64,16 @@ jobs:
 
       - name: Install dependencies and Build React
         run: |
-          cd frontend || cd Frontend
-          npm install
-          npm run build
+          PKG_FILE=$(find . -maxdepth 3 -name "package.json" -not -path "*/node_modules/*" | head -n 1)
+          if [ -n "$PKG_FILE" ]; then
+            FRONTEND_DIR=$(dirname "$PKG_FILE")
+            echo "Building React app in: $FRONTEND_DIR"
+            cd "$FRONTEND_DIR"
+            npm install
+            npm run build
+          else
+            echo "No package.json found in this repository, skipping frontend build."
+          fi
 
   # 3. Build Docker Image
   docker-build:
@@ -79,4 +89,8 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build Backend Docker Image
-        run: docker build -t cosmetic-ecommerce-backend:latest ./Backend
+        run: |
+          DOCKER_FILE=$(find . -maxdepth 2 -name "Dockerfile" | head -n 1)
+          DOCKER_DIR=$(dirname "$DOCKER_FILE")
+          echo "Building Docker image from: $DOCKER_DIR"
+          docker build -t cosmetic-ecommerce-backend:latest "$DOCKER_DIR"
