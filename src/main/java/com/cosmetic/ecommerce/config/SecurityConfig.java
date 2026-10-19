@@ -39,6 +39,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll() // Login/Register වෙන්න Token ඕනේ නැහැ
                         .requestMatchers("/api/products/**").permitAll() // Products බලන්නත් Token ඕනේ නැහැ
+                        .requestMatchers("GET", "/api/categories/**").permitAll() // Categories view - public
+                        .requestMatchers("/api/admin/**").hasAuthority("ADMIN") // Bug Fix: Admin routes explicitly locked down
                         .anyRequest().authenticated() // හැබැයි අනිත් ඕනෙම දේකට Token එක අනිවාර්යයි!
                 )
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class); // අපේ Guard ව Filter එකක් විදිහට දානවා

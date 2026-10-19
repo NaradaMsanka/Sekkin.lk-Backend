@@ -76,7 +76,7 @@ public class OrderController {
 
     // PATCH හෝ PUT /api/orders/{id}/status (Admin Dashboard සහ Postman දෙකටම වැඩ කරන ලෙස)
     @RequestMapping(value = "/{id}/status", method = {RequestMethod.PATCH, RequestMethod.PUT})
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ADMIN')") // hasRole('ADMIN') requires "ROLE_ADMIN" prefix; JwtFilter stores plain "ADMIN"
     public ResponseEntity<Order> updateOrderStatus(
             @PathVariable Long id,
             @RequestParam(required = false) String status,

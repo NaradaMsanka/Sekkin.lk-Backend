@@ -120,6 +120,10 @@ public class OrderService {
 
     // Admin සඳහා Order Status එක වෙනස් කිරීම
     public Order updateOrderStatus(Long orderId, String newStatus) {
+        // Bug Fix: newStatus == null නම් NullPointerException ලැබෙයි toUpperCase() call කරද්දී
+        if (newStatus == null || newStatus.trim().isEmpty()) {
+            throw new RuntimeException("Status value is required");
+        }
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new RuntimeException("Order not found"));
 

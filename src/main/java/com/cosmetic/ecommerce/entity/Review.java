@@ -3,7 +3,6 @@ package com.cosmetic.ecommerce.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 
 import java.time.LocalDateTime;
 
@@ -11,7 +10,8 @@ import java.time.LocalDateTime;
 @Table(name = "reviews")
 @Data
 @NoArgsConstructor
-@AllArgsConstructor
+// Bug Fix: @AllArgsConstructor removed — it overrides field default `createdAt = LocalDateTime.now()` with null.
+// @PrePersist is now used to reliably set the timestamp before DB insert.
 public class Review {
 
     @Id
@@ -24,7 +24,14 @@ public class Review {
     @Column(nullable = false, length = 1000)
     private String comment;
 
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt;
+
+    @PrePersist
+    public void setCreatedAtOnCreate() {
+        if (this.createdAt == null) {
+            this.createdAt = LocalDateTime.now();
+        }
+    }
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
