@@ -38,12 +38,11 @@ jobs:
           cache: maven
 
       - name: Run Backend Tests
-        working-directory: backend
         env:
           SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/cosmetic_db?createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true&useSSL=false
           SPRING_DATASOURCE_USERNAME: root
           SPRING_DATASOURCE_PASSWORD: root
-        run: mvn clean test
+        run: mvn -f Backend/pom.xml clean test
 
   # 2. Build React Frontend
   frontend-build:
@@ -60,13 +59,11 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install dependencies
-        working-directory: frontend
-        run: npm install
-
-      - name: Build React App
-        working-directory: frontend
-        run: npm run build
+      - name: Install dependencies and Build React
+        run: |
+          cd frontend || cd Frontend
+          npm install
+          npm run build
 
   # 3. Build Docker Image
   docker-build:
@@ -82,5 +79,4 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build Backend Docker Image
-        working-directory: backend
-        run: docker build -t cosmetic-ecommerce-backend:latest .
+        run: docker build -t cosmetic-ecommerce-backend:latest ./Backend
