@@ -1,4 +1,4 @@
-name: Java CI with Maven
+name: Full-Stack CI Pipeline
 
 on:
   push:
@@ -7,11 +7,28 @@ on:
     branches: [ "main", "master" ]
 
 jobs:
-  build:
+  # 1. Run Backend Tests (Java 21 + MySQL 8.0)
+  backend-test:
+    name: 1. Run Backend Tests
     runs-on: ubuntu-latest
 
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: cosmetic_db
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
@@ -20,5 +37,54 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Build and Test with Maven
-        run: mvn -B test --file pom.xml
+      - name: Run Backend Tests
+        working-directory: ./Backend
+        env:
+          SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/cosmetic_db?createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true&useSSL=false
+          SPRING_DATASOURCE_USERNAME: root
+          SPRING_DATASOURCE_PASSWORD: root
+        run: mvn clean test
+
+  # 2. Build React Frontend
+  frontend-build:
+    name: 2. Build React Frontend
+    needs: backend-test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies and Build React
+        run: |
+          if [ -d "frontend" ]; then cd frontend; elif [ -d "Frontend" ]; then cd Frontend; fi
+          npm install
+          npm run build
+
+  # 3. Build Docker Image
+  docker-build:
+    name: 3. Build Docker Image
+    needs: frontend-build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Backend Docker Image
+        run: |
+          if [ -f "Backend/Dockerfile" ]; then
+            docker build -t cosmetic-ecommerce-backend:latest ./Backend
+          elif [ -f "Dockerfile" ]; then
+            docker build -t cosmetic-ecommerce-backend:latest .
+          else
+            echo "Dockerfile not found!" && exit 1
+          fi
