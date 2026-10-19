@@ -25,6 +25,7 @@ public class Product {
     @Column(nullable = false)
     private BigDecimal price;
 
+    // Day 26: Discount Price field
     private BigDecimal discountPrice;
 
     private String brand;
@@ -38,7 +39,32 @@ public class Product {
     private String ingredients;
 
     private String status;
+
     @ManyToOne
     @JoinColumn(name = "category_id")
     private Category category;
+
+    // --- Day 26: Helper Methods for Discount Logic ---
+
+    /**
+     * වලංගු වට්ටම් මිලක් (discountPrice) තිබේදැයි පරීක්ෂා කරයි.
+     * (discountPrice එක 0 ට වඩා වැඩි විය යුතු අතර සාමාන්‍ය price එකට වඩා අඩු විය යුතුය)
+     */
+    public boolean hasDiscount() {
+        return this.discountPrice != null &&
+                this.discountPrice.compareTo(BigDecimal.ZERO) > 0 &&
+                this.price != null &&
+                this.discountPrice.compareTo(this.price) < 0;
+    }
+
+    /**
+     * Checkout කිරීමේදී ගත යුතු නියම මිල ලබා දෙයි.
+     * discountPrice එකක් ඇත්නම් එයත්, නැතිනම් සාමාන්‍ය price එකත් ලබා දෙයි.
+     */
+    public BigDecimal getEffectivePrice() {
+        if (hasDiscount()) {
+            return this.discountPrice;
+        }
+        return this.price;
+    }
 }

@@ -1,14 +1,16 @@
 package com.cosmetic.ecommerce.controller;
 
-import com.cosmetic.ecommerce.dto.OrderResponseDTO; // DTO එක ඉම්පෝට් කිරීම
+import com.cosmetic.ecommerce.dto.OrderResponseDTO;
 import com.cosmetic.ecommerce.entity.Order;
 import com.cosmetic.ecommerce.service.OrderService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
-import org.springframework.security.access.prepost.PreAuthorize;
 
 @RestController
 @RequestMapping("/api/orders")
@@ -24,10 +26,24 @@ public class OrderController {
         return SecurityContextHolder.getContext().getAuthentication().getName();
     }
 
+    // POST /api/orders (Day 26: shippingAddress සහ optional couponCode ලබා ගැනීම)
     @PostMapping
-    public ResponseEntity<Order> createOrder(@RequestParam String shippingAddress) {
+    public ResponseEntity<Order> createOrder(
+            @RequestParam(required = false) String shippingAddress,
+            @RequestParam(required = false) String couponCode,
+            @RequestBody(required = false) Map<String, String> body) {
+
         String email = getLoggedInUserEmail();
-        Order order = orderService.createOrder(email, shippingAddress);
+
+        // Query Param එකෙන් හෝ JSON Body එකෙන් එවන ඕනෑම ආකාරයක් ලබා ගැනීම
+        if (shippingAddress == null && body != null) {
+            shippingAddress = body.get("shippingAddress");
+        }
+        if (couponCode == null && body != null) {
+            couponCode = body.get("couponCode");
+        }
+
+        Order order = orderService.createOrder(email, shippingAddress, couponCode);
         return ResponseEntity.ok(order);
     }
 
@@ -58,12 +74,17 @@ public class OrderController {
         return ResponseEntity.ok(orderService.getOrderById(id, email));
     }
 
-    // PATCH /api/orders/{id}/status (Admin පමණයි)
-    @PatchMapping("/{id}/status")
+    // PATCH හෝ PUT /api/orders/{id}/status (Admin Dashboard සහ Postman දෙකටම වැඩ කරන ලෙස)
+    @RequestMapping(value = "/{id}/status", method = {RequestMethod.PATCH, RequestMethod.PUT})
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Order> updateOrderStatus(
             @PathVariable Long id,
-            @RequestParam String status) {
+            @RequestParam(required = false) String status,
+            @RequestBody(required = false) Map<String, String> body) {
+
+        if (status == null && body != null) {
+            status = body.get("status");
+        }
 
         Order updatedOrder = orderService.updateOrderStatus(id, status);
         return ResponseEntity.ok(updatedOrder);

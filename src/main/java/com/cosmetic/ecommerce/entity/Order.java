@@ -1,6 +1,6 @@
 package com.cosmetic.ecommerce.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnore; // අලුතින් එකතු කළ import එක
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -17,14 +17,21 @@ public class Order {
     // ඇණවුම දැමූ පුද්ගලයා
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
-    @JsonIgnore // මෙන්න මෙය එකතු කළා (Jackson මඟින් Proxy error එක මඟහරී)
+    @JsonIgnore // Jackson මඟින් Proxy error එක මඟහරී
     private User user;
 
-    // භාණ්ඩ යැවිය යුතු ලිපිනය (Address එක මෙතන තියෙනවා)
+    // භාණ්ඩ යැවිය යුතු ලිපිනය
     private String shippingAddress;
 
-    // ඇණවුම් කළ මුළු මුදල
+    // ඇණවුම් කළ මුළු මුදල (වට්ටම් අඩු කිරීමෙන් පසු අවසාන මුදල)
     private Double totalAmount;
+
+    // --- Day 26: Simple Coupon & Discount Fields ---
+    // පාරිභෝගිකයා භාවිතා කළ Coupon කේතය (උදා: GLOW10, SAVE500)
+    private String couponCode;
+
+    // Coupon හෝ වට්ටම් මඟින් අඩු වූ මුදල
+    private Double discountAmount = 0.0;
 
     // ඇණවුමේ තත්ත්වය
     private String status = "PENDING";
@@ -36,7 +43,7 @@ public class Order {
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> orderItems = new ArrayList<>();
 
-    // Getters and Setters
+    // --- Getters and Setters ---
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -48,6 +55,12 @@ public class Order {
 
     public Double getTotalAmount() { return totalAmount; }
     public void setTotalAmount(Double totalAmount) { this.totalAmount = totalAmount; }
+
+    public String getCouponCode() { return couponCode; }
+    public void setCouponCode(String couponCode) { this.couponCode = couponCode; }
+
+    public Double getDiscountAmount() { return discountAmount; }
+    public void setDiscountAmount(Double discountAmount) { this.discountAmount = discountAmount; }
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
