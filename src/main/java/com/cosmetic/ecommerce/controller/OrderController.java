@@ -1,8 +1,12 @@
 package com.cosmetic.ecommerce.controller;
 
+import com.cosmetic.ecommerce.dto.DirectOrderRequestDTO;
+import com.cosmetic.ecommerce.dto.DirectOrderResponseDTO;
 import com.cosmetic.ecommerce.dto.OrderResponseDTO;
 import com.cosmetic.ecommerce.entity.Order;
+import com.cosmetic.ecommerce.entity.OrderItem;
 import com.cosmetic.ecommerce.service.OrderService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -24,6 +28,57 @@ public class OrderController {
 
     private String getLoggedInUserEmail() {
         return SecurityContextHolder.getContext().getAuthentication().getName();
+    }
+
+    // POST /api/orders/direct (Instant Buy Now - bypasses cart, handles CARD, KOKO, COD, Delivery 350/= and sends email receipt)
+    @PostMapping("/direct")
+    public ResponseEntity<DirectOrderResponseDTO> createDirectOrder(@Valid @RequestBody DirectOrderRequestDTO request) {
+        String loggedInEmail = null;
+        try {
+            var auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getName())) {
+                loggedInEmail = auth.getName();
+            }
+        } catch (Exception ignored) {}
+
+        Order order = orderService.createDirectOrder(request, loggedInEmail);
+
+        String prodName = "Cosmetic Product";
+        Integer qty = 1;
+        Double unitPrice = 0.0;
+        if (order.getOrderItems() != null && !order.getOrderItems().isEmpty()) {
+            OrderItem firstItem = order.getOrderItems().get(0);
+            qty = firstItem.getQuantity();
+            unitPrice = firstItem.getPrice();
+            if (firstItem.getProduct() != null) {
+                prodName = firstItem.getProduct().getName();
+            }
+        }
+
+        double subtotal = unitPrice * qty;
+
+        DirectOrderResponseDTO response = DirectOrderResponseDTO.builder()
+                .orderId(order.getId())
+                .customerName(order.getCustomerName())
+                .customerPhone(order.getCustomerPhone())
+                .customerEmail(order.getCustomerEmail())
+                .shippingAddress(order.getShippingAddress())
+                .postalCode(order.getPostalCode())
+                .paymentMethod(order.getPaymentMethod())
+                .paymentStatus(order.getPaymentStatus())
+                .deliveryCharge(order.getDeliveryCharge())
+                .subtotal(subtotal)
+                .totalAmount(order.getTotalAmount())
+                .discountAmount(order.getDiscountAmount())
+                .status(order.getStatus())
+                .orderDate(order.getOrderDate())
+                .productName(prodName)
+                .quantity(qty)
+                .unitPrice(unitPrice)
+                .message("Order placed successfully. Official payment slip ready for download.")
+                .build();
+
+        return ResponseEntity.ok(response);
     }
 
     // POST /api/orders (Day 26: shippingAddress සහ optional couponCode ලබා ගැනීම)
