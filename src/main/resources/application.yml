@@ -9,6 +9,11 @@ spring:
     username: cosmetic_user
     password: cosmetic_password
     driver-class-name: org.postgresql.Driver
+  servlet:
+    multipart:
+      max-file-size: 15MB
+      max-request-size: 30MB
+      enabled: true
   jpa:
     hibernate:
       ddl-auto: update
