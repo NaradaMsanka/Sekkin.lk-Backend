@@ -40,6 +40,12 @@ public class Product {
 
     private String status;
 
+    @Column(columnDefinition = "TEXT")
+    private String imageUrl;
+
+    @Column(columnDefinition = "TEXT")
+    private String images;
+
     @ManyToOne
     @JoinColumn(name = "category_id")
     private Category category;
