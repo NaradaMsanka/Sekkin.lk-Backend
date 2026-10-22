@@ -39,7 +39,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll() // Login/Register වෙන්න Token ඕනේ නැහැ
                         .requestMatchers("/api/products/**").permitAll() // Products බලන්නත් Token ඕනේ නැහැ
+                        .requestMatchers("/uploads/**").permitAll() // Product images බලන්න Token ඕනේ නැහැ
                         .requestMatchers("GET", "/api/categories/**").permitAll() // Categories view - public
+                        .requestMatchers("/api/orders/direct").permitAll() // Direct Instant Checkout without Cart
                         .requestMatchers("/api/admin/**").hasAuthority("ADMIN") // Bug Fix: Admin routes explicitly locked down
                         .anyRequest().authenticated() // හැබැයි අනිත් ඕනෙම දේකට Token එක අනිවාර්යයි!
                 )
