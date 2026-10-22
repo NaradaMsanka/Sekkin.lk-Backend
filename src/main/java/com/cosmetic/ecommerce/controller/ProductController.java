@@ -64,6 +64,8 @@ public class ProductController {
         product.setSkinType(dto.getSkinType());
         product.setIngredients(dto.getIngredients());
         product.setStatus(dto.getStatus());
+        product.setImageUrl(dto.getImageUrl());
+        product.setImages(dto.getImages());
 
         return productService.updateProduct(id, product);
     }

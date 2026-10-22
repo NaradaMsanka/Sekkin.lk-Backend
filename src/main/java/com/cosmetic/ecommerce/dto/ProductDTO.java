@@ -24,4 +24,6 @@ public class ProductDTO {
     private String skinType;
     private String ingredients;
     private String status;
+    private String imageUrl;
+    private String images;
 }
