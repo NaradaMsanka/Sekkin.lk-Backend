@@ -40,6 +40,12 @@ public class ProductService {
         existing.setSkinType(updatedProduct.getSkinType());
         existing.setIngredients(updatedProduct.getIngredients());
         existing.setStatus(updatedProduct.getStatus());
+        if (updatedProduct.getImageUrl() != null) {
+            existing.setImageUrl(updatedProduct.getImageUrl());
+        }
+        if (updatedProduct.getImages() != null) {
+            existing.setImages(updatedProduct.getImages());
+        }
         return productRepository.save(existing);
     }
 
