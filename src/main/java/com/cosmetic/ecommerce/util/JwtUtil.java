@@ -15,13 +15,16 @@ public class JwtUtil {
     private static final String SECRET = "SekkinLkCosmeticsSuperSecretKeyForJwtAuthentication2026";
     private static final Key key = Keys.hmacShaKeyFor(SECRET.getBytes());
 
+    // Token expiry — 7 days (7 × 24 × 60 × 60 × 1000 ms)
+    private static final long TOKEN_EXPIRY_MS = 7L * 24 * 60 * 60 * 1000;
+
     // Update 1: Token එක හදද්දී Role එකත් එකතු කරනවා
     public String generateToken(String email, String role) {
         return Jwts.builder()
                 .setSubject(email)
                 .claim("role", role) // Token එක ඇතුළට Role එක දාන තැන
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 10)) // පැය 10ක් වැඩ (වැරැද්ද හැදුවා)
+                .setExpiration(new Date(System.currentTimeMillis() + TOKEN_EXPIRY_MS)) // 7 days valid
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
     }
