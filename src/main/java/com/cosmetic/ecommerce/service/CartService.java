@@ -21,7 +21,8 @@ public class CartService {
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
 
-    public CartService(CartRepository cartRepository, ProductRepository productRepository, UserRepository userRepository) {
+    public CartService(CartRepository cartRepository, ProductRepository productRepository,
+            UserRepository userRepository) {
         this.cartRepository = cartRepository;
         this.productRepository = productRepository;
         this.userRepository = userRepository;
@@ -34,7 +35,8 @@ public class CartService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found for email: " + email);
         }
 
-        // 2. Product check — if not in DB, auto-create a stub from catalog so cart add never crashes
+        // 2. Product check — if not in DB, auto-create a stub from catalog so cart add
+        // never crashes
         Product product = productRepository.findById(productId).orElseGet(() -> {
             Product stub = new Product();
             stub.setName("Cosmetics Product #" + productId);
@@ -48,7 +50,8 @@ public class CartService {
         // 3. Stock validation
         int stock = product.getStockQuantity() != null ? product.getStockQuantity() : 100;
         if (stock < quantity) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Not enough stock available. Only " + stock + " left.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Not enough stock available. Only " + stock + " left.");
         }
 
         // 4. Cart retrieval or creation
