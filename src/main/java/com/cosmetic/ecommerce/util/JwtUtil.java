@@ -5,6 +5,7 @@ import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.util.Date;
 
@@ -12,7 +13,7 @@ import java.util.Date;
 public class JwtUtil {
 
     private static final String SECRET = "SekkinLkCosmeticsSuperSecretKeyForJwtAuthentication2026";
-    private static final Key key = Keys.hmacShaKeyFor(SECRET.getBytes());
+    private static final Key key = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
 
     // Token expiry — 7 days (7 × 24 × 60 × 60 × 1000 ms)
     private static final long TOKEN_EXPIRY_MS = 7L * 24 * 60 * 60 * 1000;
@@ -48,6 +49,7 @@ public class JwtUtil {
             Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token);
             return true;
         } catch (Exception e) {
+            System.out.println("validateToken failed: " + e.getClass().getSimpleName() + " - " + e.getMessage());
             return false;
         }
     }

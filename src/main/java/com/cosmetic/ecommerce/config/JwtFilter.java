@@ -50,12 +50,15 @@ public class JwtFilter extends OncePerRequestFilter {
                     SecurityContext context = SecurityContextHolder.createEmptyContext();
                     context.setAuthentication(authToken);
                     SecurityContextHolder.setContext(context);
+                    System.out.println("JwtFilter authenticated user=" + email + ", role=" + role + " for URI=" + request.getRequestURI());
                 } else {
                     System.out.println("Invalid JWT token received for URI: " + request.getRequestURI());
                 }
             } catch (Exception e) {
                 System.out.println("JWT Filtering Error: " + e.getMessage());
             }
+        } else {
+            System.out.println("JwtFilter: No Bearer header for URI: " + request.getRequestURI());
         }
 
         filterChain.doFilter(request, response);

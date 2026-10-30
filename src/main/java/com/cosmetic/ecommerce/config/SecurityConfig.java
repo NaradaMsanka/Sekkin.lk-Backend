@@ -1,6 +1,7 @@
 package com.cosmetic.ecommerce.config;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -32,6 +33,21 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
+    /**
+     * CRITICAL BUG FIX:
+     * Spring Boot automatically discovers any bean implementing Filter and registers it
+     * in the root servlet container. If JwtFilter is registered both in the servlet container
+     * AND in Spring Security's SecurityFilterChain, it executes twice and gets skipped inside
+     * SecurityFilterChain due to OncePerRequestFilter's ALREADY_FILTERED attribute!
+     * Disabling auto-registration here ensures it ONLY runs inside SecurityFilterChain.
+     */
+    @Bean
+    public FilterRegistrationBean<JwtFilter> jwtFilterRegistration(JwtFilter filter) {
+        FilterRegistrationBean<JwtFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
@@ -40,6 +56,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, authException) -> {
+                            System.out.println("Security entryPoint triggered for URI: " + request.getRequestURI() + " - " + authException.getMessage());
                             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                             response.setContentType("application/json");
                             response.getWriter().write("{\"error\": \"Unauthorized\", \"message\": \"" + authException.getMessage() + "\"}");
