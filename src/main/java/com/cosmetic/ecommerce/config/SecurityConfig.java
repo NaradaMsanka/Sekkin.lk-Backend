@@ -53,10 +53,21 @@ public class SecurityConfig {
     @Bean
     public UrlBasedCorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of("http://localhost:5173")); // React UI එකේ URL එක
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+
+        // Local development origins - localhost all common ports
+        config.setAllowedOriginPatterns(List.of(
+                "http://localhost:*",        // All localhost ports (5173, 3000, 5174, etc.)
+                "http://127.0.0.1:*",        // 127.0.0.1 all ports
+                "https://*.netlify.app",     // Netlify hosted frontend
+                "https://*.vercel.app",      // Vercel hosted frontend
+                "https://*.onrender.com"     // Render hosted frontend
+        ));
+
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
+        config.setExposedHeaders(List.of("Authorization"));
         config.setAllowCredentials(true);
+        config.setMaxAge(3600L); // Preflight cache - 1 hour
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
