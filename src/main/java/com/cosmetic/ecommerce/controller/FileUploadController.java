@@ -12,7 +12,6 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/upload")
-@CrossOrigin
 public class FileUploadController {
 
     private final Path uploadDir = Paths.get("uploads").toAbsolutePath().normalize();

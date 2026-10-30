@@ -15,7 +15,6 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/auth")
-@CrossOrigin // connect to the reactApp
 public class AuthController {
 
     @Autowired
