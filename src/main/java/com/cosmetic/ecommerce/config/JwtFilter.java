@@ -7,13 +7,15 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import java.util.Collections;
 
 import java.io.IOException;
+import java.util.Collections;
 
 @Component
 public class JwtFilter extends OncePerRequestFilter {
@@ -25,36 +27,37 @@ public class JwtFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
         String authHeader = request.getHeader("Authorization");
 
-        // Request එකේ Token එකක් තියෙනවද බලනවා (Token එක පටන් ගන්නේ "Bearer " කියලා)
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            String token = authHeader.substring(7); // "Bearer " කෑල්ල අයින් කරලා Token එක විතරක් ගන්නවා
+            String token = authHeader.substring(7).trim();
+            // Handle edge case where token is wrapped in quotes
+            if (token.startsWith("\"") && token.endsWith("\"") && token.length() > 2) {
+                token = token.substring(1, token.length() - 1);
+            }
 
             try {
-                // ටෝකන් එක නිවැරදිද නැද්ද යන්න කන්සෝල් එකේ බලාගැනීමට
-                boolean isValid = jwtUtil.validateToken(token);
-                System.out.println("Auth Header received: " + authHeader);
-                System.out.println("Is Token Valid: " + isValid);
-
-                if (isValid) {
+                if (jwtUtil.validateToken(token)) {
                     String email = jwtUtil.extractEmail(token);
-                    String role = jwtUtil.extractRole(token); // Token එකෙන් Role එක ගන්නවා
+                    String role = jwtUtil.extractRole(token);
 
-                    System.out.println("Extracted Email: " + email);
-                    System.out.println("Extracted Role: " + role);
+                    if (role == null || role.trim().isEmpty()) {
+                        role = "USER";
+                    }
 
-                    // User ගේ Role එක Spring Security එකට තේරෙන විදිහට හදනවා
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                             email, null, Collections.singletonList(new SimpleGrantedAuthority(role)));
+                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
-                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                    SecurityContext context = SecurityContextHolder.createEmptyContext();
+                    context.setAuthentication(authToken);
+                    SecurityContextHolder.setContext(context);
+                } else {
+                    System.out.println("Invalid JWT token received for URI: " + request.getRequestURI());
                 }
             } catch (Exception e) {
                 System.out.println("JWT Filtering Error: " + e.getMessage());
             }
-        } else {
-            System.out.println("Authorization Header missing or does not start with Bearer for URI: " + request.getRequestURI());
         }
 
-        filterChain.doFilter(request, response); // ඊළඟ පියවරට යවනවා
+        filterChain.doFilter(request, response);
     }
 }

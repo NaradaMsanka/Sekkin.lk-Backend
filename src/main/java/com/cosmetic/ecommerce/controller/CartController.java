@@ -3,10 +3,12 @@ package com.cosmetic.ecommerce.controller;
 import com.cosmetic.ecommerce.dto.AddToCartRequest;
 import com.cosmetic.ecommerce.entity.Cart;
 import com.cosmetic.ecommerce.service.CartService;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/cart")
@@ -21,6 +23,9 @@ public class CartController {
     // Token එකෙන් දැනට ලොග් වෙලා ඉන්න කෙනාගේ Email එක ගන්න Method එක
     private String getLoggedInUserEmail() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || "anonymousUser".equalsIgnoreCase(auth.getName())) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated");
+        }
         return auth.getName();
     }
 
@@ -38,6 +43,7 @@ public class CartController {
         String email = getLoggedInUserEmail();
         return ResponseEntity.ok(cartService.getCart(email));
     }
+
     // PUT /api/cart/items/{productId} (Quantity එක Update කරන්න)
     @PutMapping("/items/{productId}")
     public ResponseEntity<Cart> updateItemQuantity(

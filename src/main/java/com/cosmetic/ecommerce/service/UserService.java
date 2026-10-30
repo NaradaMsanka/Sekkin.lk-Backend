@@ -14,7 +14,7 @@ public class UserService {
     private UserRepository userRepository;
 
     @Autowired
-    private PasswordEncoder passwordEncoder; // SecurityConfig එකෙන් එන BCrypt Encoder එක
+    private PasswordEncoder passwordEncoder;
 
     public String registerUser(UserRegistrationDto dto) {
         if (userRepository.existsByEmail(dto.getEmail())) {
@@ -24,8 +24,8 @@ public class UserService {
         User user = new User();
         user.setName(dto.getName());
         user.setEmail(dto.getEmail());
-        // Password එක Database එකට යන්න කලින් මෙතනදි Hash වෙනවා!
         user.setPassword(passwordEncoder.encode(dto.getPassword()));
+        user.setRole("USER");
 
         userRepository.save(user);
         return "User registered successfully!";

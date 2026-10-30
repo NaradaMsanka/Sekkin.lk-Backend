@@ -29,7 +29,6 @@ public class AuthController {
     @Autowired
     private JwtUtil jwtUtil;
 
-
     @PostMapping("/register")
     public ResponseEntity<String> register(@RequestBody UserRegistrationDto dto) {
         String response = userService.registerUser(dto);
@@ -39,16 +38,21 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
-    //login API
+    // login API
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody UserLoginDto dto) {
         Optional<User> userOpt = Optional.ofNullable(userRepository.findByEmail(dto.getEmail()));
 
         if (userOpt.isPresent()) {
             User user = userOpt.get();
-            // match the password
             if (passwordEncoder.matches(dto.getPassword(), user.getPassword())) {
-                String token = jwtUtil.generateToken(user.getEmail(), user.getRole());
+                String role = user.getRole();
+                if (role == null || role.trim().isEmpty()) {
+                    role = "USER";
+                    user.setRole("USER");
+                    userRepository.save(user); // Auto-heal DB row
+                }
+                String token = jwtUtil.generateToken(user.getEmail(), role);
                 return ResponseEntity.ok(new AuthResponseDto(token));
             }
         }
