@@ -2,7 +2,7 @@ package com.cosmetic.ecommerce.service;
 
 import com.cosmetic.ecommerce.dto.ReviewRequestDTO;
 import com.cosmetic.ecommerce.dto.ReviewResponseDTO;
-import com.cosmetic.ecommerce.entity.Order;
+import com.cosmetic.ecommerce.dto.ReviewEligibilityDTO;
 import com.cosmetic.ecommerce.entity.Product;
 import com.cosmetic.ecommerce.entity.Review;
 import com.cosmetic.ecommerce.entity.User;
@@ -11,6 +11,9 @@ import com.cosmetic.ecommerce.repository.ProductRepository;
 import com.cosmetic.ecommerce.repository.ReviewRepository;
 import com.cosmetic.ecommerce.repository.UserRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.http.HttpStatus;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -33,33 +36,32 @@ public class ReviewService {
         this.userRepository = userRepository;
     }
 
+    @Transactional(readOnly = true)
+    public ReviewEligibilityDTO getEligibility(Long productId, String userEmail) {
+        return eligibility(requireUser(userEmail), requireProduct(productId));
+    }
+
+    @Transactional
     public ReviewResponseDTO addReview(Long productId, ReviewRequestDTO request, String userEmail) {
-        User user = userRepository.findByEmail(userEmail);
-        if (user == null) {
-            throw new RuntimeException("User not found");
+        User user = requireUser(userEmail);
+        Product product = requireProduct(productId);
+        ReviewEligibilityDTO eligibility = eligibility(user, product);
+        if (eligibility.alreadyReviewed()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, eligibility.message());
         }
-
-        Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new RuntimeException("Product not found"));
-
-        // එකම භාණ්ඩයට නැවත review එකක් දැමීම වැළැක්වීම
-        if (reviewRepository.existsByUserIdAndProductId(user.getId(), product.getId())) {
-            throw new RuntimeException("You have already reviewed this product.");
+        if (!eligibility.hasPurchased()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, eligibility.message());
         }
-
-        // Rule: මිලදී ගෙන ඇත්දැයි බැලීම (Order -> OrderItem -> Product)
-        List<Order> orders = orderRepository.findByUser(user);
-        boolean hasPurchased = orders.stream()
-                .flatMap(order -> order.getOrderItems().stream())
-                .anyMatch(item -> item.getProduct().getId().equals(productId));
-
-        if (!hasPurchased) {
-            throw new RuntimeException("Only customers who purchased this product can leave a review.");
+        if (request == null || request.getRating() < 1 || request.getRating() > 5) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Choose a rating from 1 to 5.");
+        }
+        if (request.getComment() == null || request.getComment().isBlank() || request.getComment().length() > 1000) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Write a review of 1 to 1000 characters.");
         }
 
         Review review = new Review();
         review.setRating(request.getRating());
-        review.setComment(request.getComment());
+        review.setComment(request.getComment().trim());
         review.setUser(user);
         review.setProduct(product);
 
@@ -67,6 +69,27 @@ public class ReviewService {
         return mapToDTO(saved);
     }
 
+    private User requireUser(String email) {
+        User user = email == null ? null : userRepository.findByEmail(email);
+        if (user == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sign in to review a purchase.");
+        return user;
+    }
+
+    private Product requireProduct(Long productId) {
+        return productRepository.findById(productId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found."));
+    }
+
+    private ReviewEligibilityDTO eligibility(User user, Product product) {
+        boolean reviewed = reviewRepository.existsByUserIdAndProductId(user.getId(), product.getId());
+        boolean purchased = orderRepository.hasCompletedPurchase(user.getId(), product.getId());
+        String message = reviewed ? "You have already reviewed this product."
+                : purchased ? "Your purchase is verified. Share your experience."
+                : "Reviews are available after an order containing this product is delivered or completed.";
+        return new ReviewEligibilityDTO(purchased && !reviewed, purchased, reviewed, message);
+    }
+
+    @Transactional(readOnly = true)
     public List<ReviewResponseDTO> getReviewsByProduct(Long productId) {
         return reviewRepository.findByProductId(productId).stream()
                 .map(this::mapToDTO)

@@ -2,6 +2,8 @@ package com.cosmetic.ecommerce.controller;
 
 import com.cosmetic.ecommerce.dto.ReviewRequestDTO;
 import com.cosmetic.ecommerce.dto.ReviewResponseDTO;
+import com.cosmetic.ecommerce.dto.ReviewEligibilityDTO;
+import jakarta.validation.Valid;
 import com.cosmetic.ecommerce.service.ReviewService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,11 +24,17 @@ public class ReviewController {
 
     @PostMapping("/{id}/reviews")
     public ResponseEntity<ReviewResponseDTO> addReview(@PathVariable Long id,
-                                                       @RequestBody ReviewRequestDTO request,
+                                                       @Valid @RequestBody ReviewRequestDTO request,
                                                        Authentication authentication) {
         String userEmail = authentication.getName();
         ReviewResponseDTO response = reviewService.addReview(id, request, userEmail);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
+    }
+
+    @GetMapping("/{id}/reviews/eligibility")
+    public ResponseEntity<ReviewEligibilityDTO> getEligibility(@PathVariable Long id,
+                                                               Authentication authentication) {
+        return ResponseEntity.ok(reviewService.getEligibility(id, authentication.getName()));
     }
 
     @GetMapping("/{id}/reviews")
