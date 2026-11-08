@@ -3,15 +3,19 @@ package com.cosmetic.ecommerce.service;
 import com.cosmetic.ecommerce.entity.Product;
 import com.cosmetic.ecommerce.repository.ProductRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class ProductService {
 
     private final ProductRepository productRepository;
+    private final ProductImageService productImageService;
 
-    public ProductService(ProductRepository productRepository) {
+    public ProductService(ProductRepository productRepository, ProductImageService productImageService) {
         this.productRepository = productRepository;
+        this.productImageService = productImageService;
     }
 
     // save new product
@@ -29,8 +33,10 @@ public class ProductService {
                 .orElseThrow(() -> new RuntimeException("Product not found with id: " + id));
     }
     //u[date and delete product
+    @Transactional
     public Product updateProduct(Long id, Product updatedProduct) {
         Product existing = getProductById(id);
+        Set<String> previousImages = productImageService.imageUrls(existing);
         existing.setName(updatedProduct.getName());
         existing.setDescription(updatedProduct.getDescription());
         existing.setPrice(updatedProduct.getPrice());
@@ -46,12 +52,18 @@ public class ProductService {
         if (updatedProduct.getImages() != null) {
             existing.setImages(updatedProduct.getImages());
         }
-        return productRepository.save(existing);
+        Product saved = productRepository.save(existing);
+        previousImages.removeAll(productImageService.imageUrls(saved));
+        productImageService.cleanup(previousImages);
+        return saved;
     }
 
+    @Transactional
     public void deleteProduct(Long id) {
         Product product = getProductById(id);
+        Set<String> previousImages = productImageService.imageUrls(product);
         productRepository.delete(product);
+        productImageService.cleanup(previousImages);
     }
 
     public List<Product> filterProducts(String brand, String skinType, Double minPrice, Double maxPrice) {

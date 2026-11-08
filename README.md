@@ -1,5 +1,7 @@
 # Full-Stack E-Commerce Application
 
+Product image configuration: [Cloudinary setup and Render environment variables](CLOUDINARY_SETUP.md).
+
 A comprehensive E-Commerce platform built with Spring Boot and React (Currently in Backend Development Phase).
 
 ## 🚀 Progress: Milestone 1 Completed (Days 1-14)

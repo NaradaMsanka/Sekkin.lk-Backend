@@ -18,6 +18,9 @@ class ProductServiceTest {
     @Mock
     private ProductRepository productRepository; // create sample database not exact one
 
+    @Mock
+    private ProductImageService productImageService;
+
     @InjectMocks
     private ProductService productService; // testing service
 
