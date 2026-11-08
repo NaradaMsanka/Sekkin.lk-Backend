@@ -30,7 +30,7 @@ public class OrderController {
         return SecurityContextHolder.getContext().getAuthentication().getName();
     }
 
-    // POST /api/orders/direct (Instant Buy Now - bypasses cart, handles CARD, KOKO, COD, Delivery 350/= and sends email receipt)
+    // POST /api/orders/direct (COD order confirmation; no live online payment or email service)
     @PostMapping("/direct")
     public ResponseEntity<DirectOrderResponseDTO> createDirectOrder(@Valid @RequestBody DirectOrderRequestDTO request) {
         String loggedInEmail = null;
@@ -75,7 +75,7 @@ public class OrderController {
                 .productName(prodName)
                 .quantity(qty)
                 .unitPrice(unitPrice)
-                .message("Order placed successfully. Official payment slip ready for download.")
+                .message("COD order placed. Order confirmation is not proof of payment.")
                 .build();
 
         return ResponseEntity.ok(response);

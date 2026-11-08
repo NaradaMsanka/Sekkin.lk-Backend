@@ -7,6 +7,8 @@ import com.cosmetic.ecommerce.repository.ProductRepository;
 import com.cosmetic.ecommerce.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -108,9 +110,13 @@ public class OrderService {
         return savedOrder;
     }
 
-    // Direct Instant Checkout without Cart (Handles CARD, KOKO, COD, Delivery Charge 350/= and Email Receipt)
+    // Direct COD checkout without cart. Online payment methods are rejected before any stock changes.
     @Transactional
     public Order createDirectOrder(DirectOrderRequestDTO req, String loggedInEmail) {
+        String method = req.getPaymentMethod() == null ? "" : req.getPaymentMethod().trim().toUpperCase(java.util.Locale.ROOT);
+        if (!"COD".equals(method)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Online payments are not enabled. Use cash on delivery.");
+        }
         if (req.getProductId() == null) {
             throw new RuntimeException("Product ID is required");
         }
@@ -132,12 +138,8 @@ public class OrderService {
         double subtotal = unitPrice * qty;
         double totalDiscountSaved = (regularPrice > unitPrice) ? (regularPrice - unitPrice) * qty : 0.0;
 
-        // Delivery charge rule: CARD and KOKO = 350/=, COD = 0.0
+        // Preserve the existing COD charge. Online methods require a future verified provider.
         double deliveryCharge = 0.0;
-        String method = req.getPaymentMethod() != null ? req.getPaymentMethod().trim().toUpperCase() : "COD";
-        if ("CARD".equals(method) || "KOKO".equals(method)) {
-            deliveryCharge = 350.0;
-        }
 
         // Optional coupon code
         double couponDiscount = 0.0;
@@ -165,13 +167,7 @@ public class OrderService {
         order.setTotalAmount(finalTotal);
         order.setStatus("PROCESSING");
 
-        if ("CARD".equals(method)) {
-            order.setPaymentStatus("PAID");
-        } else if ("KOKO".equals(method)) {
-            order.setPaymentStatus("KOKO_APPROVED");
-        } else {
-            order.setPaymentStatus("PENDING_COD");
-        }
+        order.setPaymentStatus("PENDING_COD");
 
         // Link with user if logged in or if registered email matches
         String emailToSearch = (loggedInEmail != null && !loggedInEmail.isEmpty() && !"anonymousUser".equals(loggedInEmail))
