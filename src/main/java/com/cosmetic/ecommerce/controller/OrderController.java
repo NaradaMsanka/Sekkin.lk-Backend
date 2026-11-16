@@ -1,147 +1,73 @@
 package com.cosmetic.ecommerce.controller;
 
-import com.cosmetic.ecommerce.dto.DirectOrderRequestDTO;
-import com.cosmetic.ecommerce.dto.DirectOrderResponseDTO;
-import com.cosmetic.ecommerce.dto.OrderResponseDTO;
+import com.cosmetic.ecommerce.dto.*;
 import com.cosmetic.ecommerce.entity.Order;
 import com.cosmetic.ecommerce.entity.OrderItem;
 import com.cosmetic.ecommerce.service.OrderService;
+import com.cosmetic.ecommerce.service.OrderPlacementService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
+import java.util.*;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 
 @RestController
 @RequestMapping("/api/orders")
 public class OrderController {
-
     private final OrderService orderService;
+    private final OrderPlacementService placement;
+    public OrderController(OrderService service, OrderPlacementService placement) { orderService = service; this.placement = placement; }
 
-    public OrderController(OrderService orderService) {
-        this.orderService = orderService;
+    private String loggedInEmail() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        return auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getName()) ? auth.getName() : null;
     }
 
-    private String getLoggedInUserEmail() {
-        return SecurityContextHolder.getContext().getAuthentication().getName();
-    }
-
-    // POST /api/orders/direct (COD order confirmation; no live online payment or email service)
     @PostMapping("/direct")
-    public ResponseEntity<DirectOrderResponseDTO> createDirectOrder(@Valid @RequestBody DirectOrderRequestDTO request) {
-        String loggedInEmail = null;
-        try {
-            var auth = SecurityContextHolder.getContext().getAuthentication();
-            if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getName())) {
-                loggedInEmail = auth.getName();
-            }
-        } catch (Exception ignored) {}
-
-        Order order = orderService.createDirectOrder(request, loggedInEmail);
-
-        String prodName = "Cosmetic Product";
-        Integer qty = 1;
-        Double unitPrice = 0.0;
-        if (order.getOrderItems() != null && !order.getOrderItems().isEmpty()) {
-            OrderItem firstItem = order.getOrderItems().get(0);
-            qty = firstItem.getQuantity();
-            unitPrice = firstItem.getPrice();
-            if (firstItem.getProduct() != null) {
-                prodName = firstItem.getProduct().getName();
-            }
-        }
-
-        double subtotal = unitPrice * qty;
-
-        DirectOrderResponseDTO response = DirectOrderResponseDTO.builder()
-                .orderId(order.getId())
-                .customerName(order.getCustomerName())
-                .customerPhone(order.getCustomerPhone())
-                .customerEmail(order.getCustomerEmail())
-                .shippingAddress(order.getShippingAddress())
-                .postalCode(order.getPostalCode())
-                .paymentMethod(order.getPaymentMethod())
-                .paymentStatus(order.getPaymentStatus())
-                .deliveryCharge(order.getDeliveryCharge())
-                .subtotal(subtotal)
-                .totalAmount(order.getTotalAmount())
-                .discountAmount(order.getDiscountAmount())
-                .status(order.getStatus())
-                .orderDate(order.getOrderDate())
-                .productName(prodName)
-                .quantity(qty)
-                .unitPrice(unitPrice)
-                .message("COD order placed. Order confirmation is not proof of payment.")
-                .build();
-
-        return ResponseEntity.ok(response);
+    public ResponseEntity<DirectOrderResponseDTO> createDirectOrder(@RequestHeader("Idempotency-Key") String key,
+            @Valid @RequestBody DirectOrderRequestDTO request) {
+        Order order = placement.placeDirect(key, request, loggedInEmail());
+        OrderItem first = order.getOrderItems().getFirst();
+        BigDecimal subtotal = BigDecimal.valueOf(first.getPrice()).multiply(BigDecimal.valueOf(first.getQuantity())).setScale(2, RoundingMode.HALF_UP);
+        return ResponseEntity.ok(DirectOrderResponseDTO.builder()
+                .orderId(order.getId()).customerName(order.getCustomerName()).customerPhone(order.getCustomerPhone())
+                .customerEmail(order.getCustomerEmail()).shippingAddress(order.getShippingAddress()).postalCode(order.getPostalCode())
+                .paymentMethod(order.getPaymentMethod()).paymentStatus(order.getPaymentStatus()).deliveryCharge(order.getDeliveryCharge())
+                .subtotal(subtotal.doubleValue()).totalAmount(order.getTotalAmount()).discountAmount(order.getDiscountAmount())
+                .couponDiscount(subtotal.add(BigDecimal.valueOf(order.getDeliveryCharge())).subtract(BigDecimal.valueOf(order.getTotalAmount()))
+                        .max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP).doubleValue())
+                .status(order.getStatus()).orderDate(order.getOrderDate())
+                .productName(first.getProduct().getName()).quantity(first.getQuantity()).unitPrice(first.getPrice())
+                .message("Order request received. Acceptance requires business confirmation. This receipt is not proof of payment.").build());
     }
 
-    // POST /api/orders (Day 26: shippingAddress සහ optional couponCode ලබා ගැනීම)
     @PostMapping
-    public ResponseEntity<Order> createOrder(
-            @RequestParam(required = false) String shippingAddress,
-            @RequestParam(required = false) String couponCode,
-            @RequestBody(required = false) Map<String, String> body) {
-
-        String email = getLoggedInUserEmail();
-
-        // Query Param එකෙන් හෝ JSON Body එකෙන් එවන ඕනෑම ආකාරයක් ලබා ගැනීම
-        if (shippingAddress == null && body != null) {
-            shippingAddress = body.get("shippingAddress");
-        }
-        if (couponCode == null && body != null) {
-            couponCode = body.get("couponCode");
-        }
-
-        Order order = orderService.createOrder(email, shippingAddress, couponCode);
-        return ResponseEntity.ok(order);
+    public ResponseEntity<OrderReceiptDTO> createOrder(@RequestHeader("Idempotency-Key") String key,
+            @Valid @RequestBody CartOrderRequestDTO request) {
+        return ResponseEntity.ok(OrderReceiptDTO.from(placement.placeCart(key, request, loggedInEmail())));
     }
 
-    // GET /api/orders (සියලුම Orders DTO මඟින් ලබා ගැනීම - Serialization දෝෂය මඟහරී)
     @GetMapping
     public ResponseEntity<List<OrderResponseDTO>> getUserOrders() {
-        String email = getLoggedInUserEmail();
-        List<Order> orders = orderService.getUserOrders(email);
-
-        // Entity ලැයිස්තුව DTO ලැයිස්තුවක් බවට හැරවීම
-        List<OrderResponseDTO> orderDTOs = orders.stream().map(order ->
-                new OrderResponseDTO(
-                        order.getId(),
-                        order.getShippingAddress(),
-                        order.getTotalAmount(),
-                        order.getStatus(),
-                        order.getOrderDate()
-                )
-        ).collect(Collectors.toList());
-
-        return ResponseEntity.ok(orderDTOs);
+        return ResponseEntity.ok(orderService.getUserOrders(loggedInEmail()).stream().map(order -> {
+            OrderResponseDTO dto = new OrderResponseDTO(order.getId(), order.getShippingAddress(), order.getTotalAmount(), order.getStatus(), order.getOrderDate());
+            dto.setDeliveryCharge(order.getDeliveryCharge()); return dto;
+        }).toList());
     }
 
-    // GET /api/orders/{id} (එක් ඇණවුමක් පමණක් ලබා ගැනීම)
     @GetMapping("/{id}")
     public ResponseEntity<Order> getOrderById(@PathVariable Long id) {
-        String email = getLoggedInUserEmail();
-        return ResponseEntity.ok(orderService.getOrderById(id, email));
+        return ResponseEntity.ok(orderService.getOrderById(id, loggedInEmail()));
     }
 
-    // PATCH හෝ PUT /api/orders/{id}/status (Admin Dashboard සහ Postman දෙකටම වැඩ කරන ලෙස)
     @RequestMapping(value = "/{id}/status", method = {RequestMethod.PATCH, RequestMethod.PUT})
-    @PreAuthorize("hasAuthority('ADMIN')") // hasRole('ADMIN') requires "ROLE_ADMIN" prefix; JwtFilter stores plain "ADMIN"
-    public ResponseEntity<Order> updateOrderStatus(
-            @PathVariable Long id,
-            @RequestParam(required = false) String status,
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public ResponseEntity<Order> updateOrderStatus(@PathVariable Long id, @RequestParam(required = false) String status,
             @RequestBody(required = false) Map<String, String> body) {
-
-        if (status == null && body != null) {
-            status = body.get("status");
-        }
-
-        Order updatedOrder = orderService.updateOrderStatus(id, status);
-        return ResponseEntity.ok(updatedOrder);
+        if (status == null && body != null) status = body.get("status");
+        return ResponseEntity.ok(orderService.updateOrderStatus(id, status));
     }
 }

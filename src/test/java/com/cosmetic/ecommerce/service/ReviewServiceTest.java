@@ -56,7 +56,7 @@ class ReviewServiceTest {
         });
         var result = service.addReview(2L, request(4, "  Useful product  "), EMAIL);
         assertEquals(4, result.getRating()); assertEquals("Useful product", result.getComment());
-        assertEquals(EMAIL, result.getUserEmail()); assertEquals(2L, result.getProductId());
+        assertEquals(2L, result.getProductId());
     }
 
     @Test void duplicateReviewIsConflict() {

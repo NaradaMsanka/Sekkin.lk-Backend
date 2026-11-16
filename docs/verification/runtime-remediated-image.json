@@ -1,0 +1,16 @@
+{
+    "scope":  "Local remediated source runtime stage plus exact209-tested JAR; not full source builder or hosted deployment",
+    "image":  "sekkin-backend-runtime-remediated:20261116",
+    "imageId":  "sha256:2697a7fea6925137a8494fc859670669634c67cf96b5a00cdec3a78f39eec6e8",
+    "repoDigests":  [
+                        "sekkin-backend-runtime-remediated@sha256:2697a7fea6925137a8494fc859670669634c67cf96b5a00cdec3a78f39eec6e8"
+                    ],
+    "configuredUser":  "10001:10001",
+    "baseImage":  "eclipse-temurin:21-jre-alpine",
+    "baseImageDigests":  [
+                             "eclipse-temurin@sha256:ac05c3c42b7c2f1a52c9bd52f01041fa1958231b15ebeae7420429cbc5baf474"
+                         ],
+    "jarSha256":  "1977b3ab4a4a5ff4c061f4a2dc03ceb6c564de9d91c5a4677e15a163fd336433",
+    "javaVersion":  "openjdk version \"21.0.13\" 2026-10-20 LTS\r\nOpenJDK Runtime Environment Temurin-21.0.13+9 (build 21.0.13+9-LTS)\r\nOpenJDK 64-Bit Server VM Temurin-21.0.13+9 (build 21.0.13+9-LTS, mixed mode, sharing)",
+    "hostedRuntimeVerified":  false
+}

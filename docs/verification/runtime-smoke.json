@@ -1,0 +1,36 @@
+{
+    "checkedAtUtc":  "2026-11-16T10:58:11.8052640+00:00",
+    "scope":  "Actual local non-root application container and disposable PostgreSQL; synthetic fixtures only",
+    "image":  "sekkin-backend-runtime-remediated:20261116",
+    "postgresImage":  "postgres:17-alpine",
+    "productionDataChanged":  false,
+    "hostedRuntimeVerified":  false,
+    "checks":  [
+                   "Image explicitly configures numeric non-root UID/GID 10001",
+                   "Legacy synthetic schema accepts the exact manual migration",
+                   "Application HTTP port is exposed only on loopback",
+                   "Actual application starts with Hibernate validate and serves public product HTTP requests",
+                   "Running application process uses UID 10001",
+                   "Application JAR is readable but not writable; temporary upload storage remains writable",
+                   "Running image contains the exact 209-test packaged JAR",
+                   "Unused GnuPG and its vulnerable SQLite library are absent",
+                   "Installed zlib contains the Alpine 1.4 vendor fix",
+                   "Guest COD order succeeds through the actual embedded HTTP server",
+                   "Runtime receipt records fixed LKR 350 and pending COD, never automatic PAID",
+                   "Repeated idempotent HTTP request returns the same order",
+                   "Database has one new order, one stock decrement, and unchanged historical zero-delivery totals",
+                   "Anonymous runtime request cannot read admin orders",
+                   "Actual runtime CORS accepts only the configured test browser origin"
+               ],
+    "passed":  true,
+    "imageId":  "sha256:2697a7fea6925137a8494fc859670669634c67cf96b5a00cdec3a78f39eec6e8",
+    "imageDigests":  [
+                         "sekkin-backend-runtime-remediated@sha256:2697a7fea6925137a8494fc859670669634c67cf96b5a00cdec3a78f39eec6e8"
+                     ],
+    "configuredUser":  "10001:10001",
+    "jarSha256":  "1977b3ab4a4a5ff4c061f4a2dc03ceb6c564de9d91c5a4677e15a163fd336433",
+    "migrationSha256":  "cd2cb87426c043ef8e6376a819218b103d0991372bc299474efc3c64262db177",
+    "postgresqlVersion":  "postgres (PostgreSQL) 17.12",
+    "zlibVersion":  "1.4-r0",
+    "cleanupCompleted":  true
+}

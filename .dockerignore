@@ -1,0 +1,11 @@
+.git/
+target/
+.env
+.env.*
+**/.env
+**/.env.*
+.idea/
+.vscode/
+*.log
+docs/verification/
+docs/release-verification/

@@ -14,10 +14,17 @@ RUN mvn clean package -DskipTests
 
 # Stage 2: Run the application
 FROM eclipse-temurin:21-jre-alpine
+# GnuPG verifies the JDK while the upstream image is built. This Java entrypoint
+# does not use GnuPG or GNU coreutils; retain BusyBox and the JRE dependencies.
+# Removing unused GnuPG also removes its vulnerable SQLite dependency chain.
+RUN apk upgrade --no-cache && apk del --no-cache gnupg coreutils
 WORKDIR /app
 
 # Copy the built jar file from the build stage
-COPY --from=build /app/target/*.jar app.jar
+COPY --from=build --chmod=0444 /app/target/*.jar app.jar
+
+# Port 8080 and temporary multipart storage do not require root privileges.
+USER 10001:10001
 
 # Expose port 8080
 EXPOSE 8080

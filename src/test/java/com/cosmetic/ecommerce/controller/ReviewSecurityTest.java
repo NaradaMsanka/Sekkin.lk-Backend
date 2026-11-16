@@ -8,8 +8,8 @@ import com.cosmetic.ecommerce.service.ReviewService;
 import com.cosmetic.ecommerce.util.JwtUtil;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -25,8 +25,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import({SecurityConfig.class, JwtFilter.class, ReviewExceptionHandler.class})
 class ReviewSecurityTest {
     @Autowired MockMvc mvc;
-    @MockBean ReviewService reviews;
-    @MockBean JwtUtil jwt;
+    @MockitoBean ReviewService reviews;
+    @MockitoBean JwtUtil jwt;
+    @MockitoBean com.cosmetic.ecommerce.repository.UserRepository users;
     private static final String BODY = "{\"rating\":5,\"comment\":\"Useful product\"}";
 
     @Test void anonymousCanReadButCannotWriteOrCheckAccountEligibility() throws Exception {
