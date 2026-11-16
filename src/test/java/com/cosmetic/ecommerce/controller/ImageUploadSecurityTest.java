@@ -7,8 +7,8 @@ import com.cosmetic.ecommerce.service.ProductService;
 import com.cosmetic.ecommerce.util.JwtUtil;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -23,10 +23,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import({SecurityConfig.class, JwtFilter.class})
 class ImageUploadSecurityTest {
     @Autowired private MockMvc mvc;
-    @MockitoBean private CloudinaryService images;
-    @MockitoBean private ProductService products;
-    @MockitoBean private JwtUtil jwtUtil;
-    @MockitoBean private com.cosmetic.ecommerce.repository.UserRepository users;
+    @MockBean private CloudinaryService images;
+    @MockBean private ProductService products;
+    @MockBean private JwtUtil jwtUtil;
 
     private MockMultipartFile image() {
         return new MockMultipartFile("file", "product.webp", "image/webp", new byte[]{1, 2, 3});

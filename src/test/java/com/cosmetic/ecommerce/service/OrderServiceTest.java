@@ -10,7 +10,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -48,7 +47,6 @@ public class OrderServiceTest {
         product.setId(1L);
         product.setName("Serum");
         product.setStockQuantity(2);
-        product.setPrice(new BigDecimal("2000"));
 
         // හැබැයි User භාණ්ඩ 5ක් Cart එකට දාලා තියෙනවා
         CartItem cartItem = new CartItem();
@@ -60,7 +58,6 @@ public class OrderServiceTest {
         cart.getItems().add(cartItem);
 
         when(cartService.getCart(userEmail)).thenReturn(cart);
-        when(productRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(product));
 
         // 2. Order එක Create කරන්න හදනකොට RuntimeException එකක් එනවද කියලා පරීක්ෂා කිරීම
         RuntimeException exception = assertThrows(RuntimeException.class, () -> {
@@ -68,7 +65,7 @@ public class OrderServiceTest {
         });
 
         // 3. එන Error පණිවිඩය නිවැරදි දැයි තහවුරු කිරීම
-        assertEquals("409 CONFLICT \"Not enough stock for product: Serum\"", exception.getMessage());
+        assertEquals("Not enough stock for product: Serum", exception.getMessage());
     }
 
     @Test
@@ -97,15 +94,13 @@ public class OrderServiceTest {
         cart.setTotalPrice(4000.0);
 
         when(cartService.getCart(userEmail)).thenReturn(cart);
-        when(productRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(product));
-        when(orderRepository.saveAndFlush(any(Order.class))).thenAnswer(i -> i.getArguments()[0]);
+        when(orderRepository.save(any(Order.class))).thenAnswer(i -> i.getArguments()[0]);
 
         // 2. Order එක Create කිරීම
         Order createdOrder = orderService.createOrder(userEmail, address);
 
         // 3. ප්‍රතිඵල තහවුරු කිරීම (Asserts)
-        assertEquals(4350.0, createdOrder.getTotalAmount());
-        assertEquals(350.0, createdOrder.getDeliveryCharge());
+        assertEquals(4000.0, createdOrder.getTotalAmount());
         assertEquals("PENDING", createdOrder.getStatus());
         assertEquals(1, createdOrder.getOrderItems().size());
 

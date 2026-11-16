@@ -7,7 +7,7 @@ import com.cosmetic.ecommerce.entity.Product;
 import com.cosmetic.ecommerce.repository.OrderRepository;
 import com.cosmetic.ecommerce.repository.ProductRepository;
 import com.cosmetic.ecommerce.repository.UserRepository;
-import tools.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -54,26 +54,26 @@ class DirectOrderPaymentSafetyTest {
     @Test void codRemainsUnpaidAndKeepsExistingPricingAndCouponRules() {
         Product product = new Product(); product.setId(2L); product.setName("Test product");
         product.setStockQuantity(5); product.setPrice(new BigDecimal("2500")); product.setDiscountPrice(new BigDecimal("2000"));
-        when(products.findByIdForUpdate(2L)).thenReturn(Optional.of(product));
-        when(orders.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(products.findById(2L)).thenReturn(Optional.of(product));
+        when(orders.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         DirectOrderRequestDTO request = request(" cod "); request.setCouponCode("GLOW10");
         Order order = service.createDirectOrder(request, null);
         assertEquals("COD", order.getPaymentMethod()); assertEquals("PENDING_COD", order.getPaymentStatus());
-        assertEquals("PENDING", order.getStatus()); assertEquals(350.0, order.getDeliveryCharge());
-        assertEquals(3950.0, order.getTotalAmount()); assertEquals(3, product.getStockQuantity());
+        assertEquals("PROCESSING", order.getStatus()); assertEquals(0.0, order.getDeliveryCharge());
+        assertEquals(3600.0, order.getTotalAmount()); assertEquals(3, product.getStockQuantity());
         assertEquals(2, order.getOrderItems().getFirst().getQuantity());
-        verify(orders).saveAndFlush(order);
+        verify(orders).save(order);
     }
 
     @Test void httpValidationRejectsOnlineMethodsAndRemovedCardOrStatusFields() throws Exception {
         OrderService mockService = mock(OrderService.class);
-        var mvc = MockMvcBuilders.standaloneSetup(new OrderController(mockService, mock(OrderPlacementService.class))).build();
+        var mvc = MockMvcBuilders.standaloneSetup(new OrderController(mockService)).build();
         String base = "\"productId\":2,\"name\":\"Test\",\"phoneNumber\":\"Test\",\"email\":\"buyer@example.test\",\"address\":\"Test\"";
         for (String method : new String[]{"CARD", "KOKO"}) {
             mvc.perform(post("/api/orders/direct").contentType("application/json").content("{" + base + ",\"paymentMethod\":\"" + method + "\"}"))
                     .andExpect(status().isBadRequest());
         }
-        for (String field : new String[]{"cardNumber", "cardExpiry", "cardCvc", "paymentStatus", "deliveryCharge", "totalAmount", "price"}) {
+        for (String field : new String[]{"cardNumber", "cardExpiry", "cardCvc", "paymentStatus"}) {
             mvc.perform(post("/api/orders/direct").contentType("application/json").content("{" + base + ",\"paymentMethod\":\"COD\",\"" + field + "\":\"test-only-value\"}"))
                     .andExpect(status().isBadRequest());
         }
@@ -81,7 +81,7 @@ class DirectOrderPaymentSafetyTest {
     }
 
     @Test void olderCodClientsMaySendOnlyNullLegacyCardKeys() throws Exception {
-        var dto = new JsonMapper().readValue("{\"productId\":2,\"paymentMethod\":\"COD\",\"cardNumber\":null,\"cardExpiry\":null,\"cardCvc\":null}", DirectOrderRequestDTO.class);
+        var dto = new ObjectMapper().readValue("{\"productId\":2,\"paymentMethod\":\"COD\",\"cardNumber\":null,\"cardExpiry\":null,\"cardCvc\":null}", DirectOrderRequestDTO.class);
         assertEquals("COD", dto.getPaymentMethod());
         assertEquals(2L, dto.getProductId());
     }

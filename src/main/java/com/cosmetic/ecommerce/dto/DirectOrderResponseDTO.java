@@ -23,7 +23,6 @@ public class DirectOrderResponseDTO {
     private Double subtotal;
     private Double totalAmount;
     private Double discountAmount;
-    private Double couponDiscount;
     private String status;
     private LocalDateTime orderDate;
     private String productName;

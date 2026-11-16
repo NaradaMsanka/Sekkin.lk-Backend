@@ -102,6 +102,7 @@ public class ReviewService {
         dto.setRating(review.getRating());
         dto.setComment(review.getComment());
         dto.setCreatedAt(review.getCreatedAt());
+        dto.setUserEmail(review.getUser().getEmail());
         dto.setProductId(review.getProduct().getId());
         return dto;
     }

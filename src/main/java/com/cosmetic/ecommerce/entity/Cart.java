@@ -1,7 +1,6 @@
 package com.cosmetic.ecommerce.entity;
 
 import jakarta.persistence.*;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -14,7 +13,6 @@ public class Cart {
 
     @OneToOne
     @JoinColumn(name = "user_id")
-    @JsonIgnore
     private User user; // මේ කරත්තය අයිති කාටද
 
     @OneToMany(mappedBy = "cart", cascade = CascadeType.ALL, orphanRemoval = true)

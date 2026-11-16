@@ -9,39 +9,30 @@ import lombok.Data;
 @Data
 public class DirectOrderRequestDTO {
     @NotNull(message = "Product ID is required")
-    @jakarta.validation.constraints.Min(1)
     private Long productId;
 
-    @jakarta.validation.constraints.Min(1) private Integer quantity = 1;
+    private Integer quantity = 1;
 
     @NotBlank(message = "Customer name is required")
-    @jakarta.validation.constraints.Size(max = 160) private String name;
+    private String name;
 
     @NotBlank(message = "Phone number is required")
-    @jakarta.validation.constraints.Size(max = 40) private String phoneNumber;
+    private String phoneNumber;
 
     @NotBlank(message = "Shipping address is required")
-    @jakarta.validation.constraints.Size(max = 2000) private String address;
+    private String address;
 
-    @jakarta.validation.constraints.Size(max = 40) private String postalCode;
+    private String postalCode;
 
     @NotBlank(message = "Email is required")
-    @jakarta.validation.constraints.Size(max = 254) private String email;
+    private String email;
 
     // COD only until online payments have verified provider integration.
     @NotBlank(message = "Payment method is required")
-    @jakarta.validation.constraints.Size(max = 16)
     @Pattern(regexp = "(?i)\\s*COD\\s*", message = "Online payments are not enabled. Use cash on delivery.")
     private String paymentMethod;
 
-    @jakarta.validation.constraints.Size(max = 80) private String couponCode;
-
-    // Consent check only. The server still calculates every price and delivery charge.
-    @NotNull(message = "Displayed order total is required")
-    @jakarta.validation.constraints.DecimalMin("0.01")
-    @jakarta.validation.constraints.Digits(integer = 15, fraction = 2)
-    @jakarta.validation.constraints.DecimalMax("999999999999999.99")
-    private java.math.BigDecimal expectedTotal;
+    private String couponCode;
 
     // Reject removed card fields and client-supplied payment statuses without retaining their values.
     @JsonAnySetter

@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
-@org.springframework.transaction.annotation.Transactional(readOnly = true)
 public class AdminService {
 
     private final OrderRepository orderRepository;
@@ -35,8 +34,7 @@ public class AdminService {
 
         // මුළු ආදායම ගණනය කිරීම (CANCELLED නොවන ඇණවුම් වල එකතුව)
         double totalRevenue = allOrders.stream()
-                .filter(o -> o.getTotalAmount() != null && "COD".equals(o.getPaymentMethod())
-                        && "PAID".equals(o.getPaymentStatus()) && o.getCodCollectedAt() != null)
+                .filter(o -> o.getTotalAmount() != null && !"CANCELLED".equalsIgnoreCase(o.getStatus()))
                 .mapToDouble(Order::getTotalAmount)
                 .sum();
 
@@ -81,21 +79,12 @@ public class AdminService {
                 .collect(Collectors.toList());
     }
 
-    public List<AdminOrderDTO> getAllOrders() {
-        return orderRepository.findAll().stream().map(AdminOrderDTO::from).toList();
-    }
-
-    public AdminOrderDTO getOrder(Long id) {
-        return AdminOrderDTO.from(orderRepository.findById(id).orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
-                org.springframework.http.HttpStatus.NOT_FOUND, "Order not found")));
-    }
-
     private UserSummaryDTO mapToUserDTO(User user) {
         UserSummaryDTO dto = new UserSummaryDTO();
         dto.setId(user.getId());
         dto.setName(user.getName()); // ඔබේ User entity එකේ username හෝ fullName නම් ඒ අනුව වෙනස් කරන්න
         dto.setEmail(user.getEmail());
-        dto.setRole(java.util.Objects.toString(user.getRole(), "UNSUPPORTED")); // Role එක String එකක් නම් .toString() අවශ්‍ය නැත
+        dto.setRole(user.getRole().toString()); // Role එක String එකක් නම් .toString() අවශ්‍ය නැත
         return dto;
     }
 }

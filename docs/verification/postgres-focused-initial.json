@@ -1,9 +1,0 @@
-{
-    "scope":  "Initial real PostgreSQL17.12 focused integration run before full-run wrapper",
-    "tests":  14,
-    "failures":  0,
-    "errors":  0,
-    "skipped":  0,
-    "context":  "Full Boot4.1.2 application, synthetic legacy schema, exact manual migration twice, Hibernatevalidate",
-    "productionDataChanged":  false
-}

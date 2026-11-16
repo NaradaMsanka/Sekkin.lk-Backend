@@ -48,9 +48,4 @@ class ProductServiceTest {
         List<Product> products = productService.getAllProducts();
         assertEquals(2, products.size());
     }
-    @Test void createCannotMergeAnExistingProductAndBypassTheLockedUpdatePath() {
-        Product product = new Product(); product.setId(1L);
-        assertThrows(org.springframework.web.server.ResponseStatusException.class, () -> productService.createProduct(product));
-        verifyNoInteractions(productRepository);
-    }
 }

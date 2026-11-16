@@ -8,7 +8,6 @@ public class OrderResponseDTO {
     private Double totalAmount;
     private String status;
     private LocalDateTime orderDate;
-    private Double deliveryCharge;
 
     public OrderResponseDTO(Long id, String shippingAddress, Double totalAmount, String status, LocalDateTime orderDate) {
         this.id = id;
@@ -24,6 +23,4 @@ public class OrderResponseDTO {
     public Double getTotalAmount() { return totalAmount; }
     public String getStatus() { return status; }
     public LocalDateTime getOrderDate() { return orderDate; }
-    public Double getDeliveryCharge() { return deliveryCharge; }
-    public void setDeliveryCharge(Double deliveryCharge) { this.deliveryCharge = deliveryCharge; }
 }
