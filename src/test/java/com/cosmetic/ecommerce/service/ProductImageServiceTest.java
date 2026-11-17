@@ -2,7 +2,7 @@ package com.cosmetic.ecommerce.service;
 
 import com.cosmetic.ecommerce.entity.Product;
 import com.cosmetic.ecommerce.repository.ProductRepository;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Set;
@@ -13,7 +13,7 @@ import static org.mockito.Mockito.*;
 class ProductImageServiceTest {
     private final ProductRepository products = mock(ProductRepository.class);
     private final CloudinaryService cloudinary = mock(CloudinaryService.class);
-    private final ProductImageService service = new ProductImageService(products, cloudinary, new ObjectMapper());
+    private final ProductImageService service = new ProductImageService(products, cloudinary, new JsonMapper());
 
     @Test void retainedAndSharedImagesAreNotDeleted() {
         Product otherProduct = new Product();

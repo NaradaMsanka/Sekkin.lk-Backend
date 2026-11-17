@@ -2,6 +2,8 @@ package com.cosmetic.ecommerce.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.ToString;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
 @Data
@@ -16,7 +18,17 @@ public class User {
     @Column(unique = true)
     private String email;
 
-    private String password; // මේක Save වෙන්නේ Hash වෙලා
+    @JsonIgnore
+    @ToString.Exclude
+    private String password; // Server-only password hash; never serialize or log.
+
+    @JsonIgnore
+    @ToString.Exclude
+    @Column(name = "session_version", nullable = false)
+    private long sessionVersion = 0;
+
+    @Column(nullable = false)
+    private boolean enabled = true;
 
     private String role = "USER"; // "USER" හෝ "ADMIN" විදිහට දෙන්න පුළුවන්
 }

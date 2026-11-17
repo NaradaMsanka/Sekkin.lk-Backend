@@ -27,6 +27,7 @@ class ReviewSecurityTest {
     @Autowired MockMvc mvc;
     @MockBean ReviewService reviews;
     @MockBean JwtUtil jwt;
+    @MockBean com.cosmetic.ecommerce.repository.UserRepository users;
     private static final String BODY = "{\"rating\":5,\"comment\":\"Useful product\"}";
 
     @Test void anonymousCanReadButCannotWriteOrCheckAccountEligibility() throws Exception {

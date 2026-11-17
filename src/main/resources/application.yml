@@ -1,18 +1,27 @@
+security:
+  jwt:
+    secret: ${JWT_SECRET}
+
 cloudinary:
   cloud-name: ${CLOUDINARY_CLOUD_NAME:}
   api-key: ${CLOUDINARY_API_KEY:}
   api-secret: ${CLOUDINARY_API_SECRET:}
 
 server:
-  port: 8080
+  error:
+    include-message: never
+    include-binding-errors: never
+    include-stacktrace: never
+
+  port: ${PORT:8080}
 
 spring:
   application:
     name: cosmetic-ecommerce
   datasource:
-    url: jdbc:postgresql://localhost:5432/cosmetic_db
-    username: cosmetic_user
-    password: cosmetic_password
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: org.postgresql.Driver
   servlet:
     multipart:
@@ -21,9 +30,22 @@ spring:
       enabled: true
   jpa:
     hibernate:
-      ddl-auto: update
-    show-sql: true
+      ddl-auto: ${JPA_DDL_AUTO:validate}
+    show-sql: false
     properties:
       hibernate:
-        format_sql: true
+        format_sql: false
         dialect: org.hibernate.dialect.PostgreSQLDialect
+
+app:
+  checkout:
+    enabled: ${CHECKOUT_ENABLED:false}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:https://sekkin-lk-frontend.vercel.app,http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173}
+
+logging:
+  level:
+    org.springframework.web: INFO
+    org.springframework.security: WARN
+    org.hibernate.SQL: WARN
+    org.hibernate.orm.jdbc.bind: "OFF"

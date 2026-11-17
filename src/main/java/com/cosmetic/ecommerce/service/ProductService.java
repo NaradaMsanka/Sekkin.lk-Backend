@@ -20,6 +20,8 @@ public class ProductService {
 
     // save new product
     public Product createProduct(Product product) {
+        if (product.getId() != null) throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.BAD_REQUEST, "New products must not supply an existing ID");
         return productRepository.save(product);
     }
 
@@ -35,7 +37,8 @@ public class ProductService {
     //u[date and delete product
     @Transactional
     public Product updateProduct(Long id, Product updatedProduct) {
-        Product existing = getProductById(id);
+        Product existing = productRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new RuntimeException("Product not found with id: " + id));
         Set<String> previousImages = productImageService.imageUrls(existing);
         existing.setName(updatedProduct.getName());
         existing.setDescription(updatedProduct.getDescription());
@@ -60,7 +63,8 @@ public class ProductService {
 
     @Transactional
     public void deleteProduct(Long id) {
-        Product product = getProductById(id);
+        Product product = productRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new RuntimeException("Product not found with id: " + id));
         Set<String> previousImages = productImageService.imageUrls(product);
         productRepository.delete(product);
         productImageService.cleanup(previousImages);

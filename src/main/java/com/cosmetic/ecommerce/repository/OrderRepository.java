@@ -11,6 +11,12 @@ import java.util.List;
 
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Long> {
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"orderItems", "orderItems.product"})
+    java.util.Optional<Order> findByRequestKeyHash(String requestKeyHash);
+
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select o from Order o where o.id = :id")
+    java.util.Optional<Order> findByIdForUpdate(@Param("id") Long id);
     List<Order> findByUserEmail(String email); // User ගේ Orders හොයාගන්න
     List<Order> findByUser(User user);         // ReviewService සඳහා
 

@@ -26,6 +26,7 @@ class ImageUploadSecurityTest {
     @MockBean private CloudinaryService images;
     @MockBean private ProductService products;
     @MockBean private JwtUtil jwtUtil;
+    @MockBean private com.cosmetic.ecommerce.repository.UserRepository users;
 
     private MockMultipartFile image() {
         return new MockMultipartFile("file", "product.webp", "image/webp", new byte[]{1, 2, 3});

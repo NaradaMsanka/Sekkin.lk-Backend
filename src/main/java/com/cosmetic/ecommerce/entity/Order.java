@@ -14,6 +14,38 @@ public class Order {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // Retry capabilities and operational audit fields are never accepted from checkout JSON.
+    @JsonIgnore @Column(length = 64, unique = true)
+    private String requestKeyHash;
+    @JsonIgnore @Column(length = 64)
+    private String requestFingerprint;
+    @JsonIgnore private Boolean inventoryReserved;
+    private LocalDateTime acceptedAt;
+    @JsonIgnore private String acceptedBy;
+    @JsonIgnore @Column(length = 160) private String acceptanceReference;
+    private LocalDateTime codCollectedAt;
+    @JsonIgnore private String codCollectedBy;
+    @JsonIgnore @Column(length = 160) private String codCollectionReference;
+
+    public String getRequestKeyHash() { return requestKeyHash; }
+    public void setRequestKeyHash(String value) { requestKeyHash = value; }
+    public String getRequestFingerprint() { return requestFingerprint; }
+    public void setRequestFingerprint(String value) { requestFingerprint = value; }
+    public Boolean getInventoryReserved() { return inventoryReserved; }
+    public void setInventoryReserved(Boolean value) { inventoryReserved = value; }
+    public LocalDateTime getAcceptedAt() { return acceptedAt; }
+    public void setAcceptedAt(LocalDateTime value) { acceptedAt = value; }
+    public String getAcceptedBy() { return acceptedBy; }
+    public void setAcceptedBy(String value) { acceptedBy = value; }
+    public String getAcceptanceReference() { return acceptanceReference; }
+    public void setAcceptanceReference(String value) { acceptanceReference = value; }
+    public LocalDateTime getCodCollectedAt() { return codCollectedAt; }
+    public void setCodCollectedAt(LocalDateTime value) { codCollectedAt = value; }
+    public String getCodCollectedBy() { return codCollectedBy; }
+    public void setCodCollectedBy(String value) { codCollectedBy = value; }
+    public String getCodCollectionReference() { return codCollectionReference; }
+    public void setCodCollectionReference(String value) { codCollectionReference = value; }
+
     // ඇණවුම දැමූ පුද්ගලයා
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = true) // Allows guest direct checkout as well as logged in user

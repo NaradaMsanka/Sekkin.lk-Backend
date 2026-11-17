@@ -7,21 +7,22 @@ on:
     branches: [ "main", "master" ]
 
 jobs:
-  # 1. Run Backend Tests (Java 21 + MySQL 8.0)
+  # 1. Run Backend Tests (Java 21 + disposable PostgreSQL)
   backend-test:
     name: 1. Run Backend Tests
     runs-on: ubuntu-latest
 
     services:
-      mysql:
-        image: mysql:8.0
+      postgres:
+        image: postgres:17-alpine
         env:
-          MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: cosmetic_db
+          POSTGRES_DB: sekkin_release_test
+          POSTGRES_USER: sekkin_test
+          POSTGRES_HOST_AUTH_METHOD: trust
         ports:
-          - 3306:3306
+          - 5432:5432
         options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -u root -proot"
+          --health-cmd="pg_isready -U sekkin_test -d sekkin_release_test"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=10
@@ -37,21 +38,17 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
+      - name: Mark disposable PostgreSQL database
+        run: |
+          docker exec "${{ job.services.postgres.id }}" psql -U sekkin_test -d sekkin_release_test \
+            -c "COMMENT ON DATABASE sekkin_release_test IS 'SEKKIN_DISPOSABLE_RELEASE_VERIFICATION';"
+
       - name: Run Backend Tests
         env:
-          SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/cosmetic_db?createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true&useSSL=false
-          SPRING_DATASOURCE_USERNAME: root
-          SPRING_DATASOURCE_PASSWORD: root
-          SPRING_JPA_HIBERNATE_DDL_AUTO: update
+          SEKKIN_RUN_POSTGRES_TESTS: 'true'
+          SEKKIN_POSTGRES_TEST_URL: jdbc:postgresql://127.0.0.1:5432/sekkin_release_test
         run: |
-          POM_FILE=$(find . -maxdepth 2 -name "pom.xml" | head -n 1)
-          echo "Using POM file at: $POM_FILE"
-          mvn -f "$POM_FILE" clean test \
-            -Dspring.datasource.url="jdbc:mysql://127.0.0.1:3306/cosmetic_db?createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true&useSSL=false" \
-            -Dspring.datasource.username=root \
-            -Dspring.datasource.password=root \
-            -Dspring.jpa.hibernate.ddl-auto=update \
-            -Dmaven.test.failure.ignore=true
+          mvn -B clean test
 
   # 2. Build React Frontend
   frontend-build:
@@ -66,7 +63,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Install dependencies and Build React
         run: |

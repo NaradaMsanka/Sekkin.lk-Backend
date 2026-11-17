@@ -22,6 +22,8 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/cosmetic_db
       SPRING_DATASOURCE_USERNAME: cosmetic_user
       SPRING_DATASOURCE_PASSWORD: cosmetic_password
+      JWT_SECRET: ${JWT_SECRET:?Set a private JWT_SECRET of at least 32 bytes before starting Compose}
+      CHECKOUT_ENABLED: ${CHECKOUT_ENABLED:-false}
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
     depends_on:
       - postgres
