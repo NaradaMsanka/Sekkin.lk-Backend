@@ -53,6 +53,7 @@ The normal test suite uses isolated fixtures. Real PostgreSQL tests additionally
 | Route | Purpose |
 | --- | --- |
 | `POST /api/auth/register`, `POST /api/auth/login` | Customer accounts |
+| `POST /api/auth/forgot-password`, `POST /api/auth/reset-password` | Email password recovery |
 | `GET /api/products`, `GET /api/categories` | Public catalog |
 | `GET /api/cart`, `POST /api/cart/items` | Authenticated customer cart |
 | `POST /api/orders` | Authenticated cart checkout |
@@ -63,3 +64,5 @@ The normal test suite uses isolated fixtures. Real PostgreSQL tests additionally
 | `POST /api/admin/orders/{id}/cod-collection` | Record verified COD collection |
 
 Order creation requires an `Idempotency-Key` UUIDv4 header. The frontend manages retry keys.
+
+Password recovery uses the existing BCrypt/JWT system and Resend SMTP. It requires an additive SQL migration and backend runtime secrets before enabling email. See [password recovery setup, deployment and verification](docs/PASSWORD_RESET.md). Nothing is deployed automatically.

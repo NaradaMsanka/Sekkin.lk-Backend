@@ -64,6 +64,8 @@ class PostgresReleaseIntegrationTest {
             // Execute the exact reviewed additive migration, then rehearse safe repeated application.
             String migration = Files.readString(Path.of("docs/migrations/2026-11-16-order-session-safety.sql"));
             statement.execute(migration); statement.execute(migration);
+            String passwordResetMigration = Files.readString(Path.of("docs/migrations/2026-11-22-password-reset.sql"));
+            statement.execute(passwordResetMigration); statement.execute(passwordResetMigration);
         }
         properties.add("spring.datasource.url", () -> URL);
         properties.add("spring.datasource.username", () -> "sekkin_test");
@@ -76,6 +78,12 @@ class PostgresReleaseIntegrationTest {
         properties.add("security.jwt.secret", () -> SYNTHETIC_KEY);
         properties.add("app.cors.allowed-origins", () -> "https://isolated.sekkin.test");
         properties.add("app.checkout.enabled", () -> "true");
+        properties.add("app.password-reset.enabled", () -> "false");
+        properties.add("app.password-reset.frontend-url", () -> "https://isolated.sekkin.test");
+        properties.add("spring.mail.host", () -> "127.0.0.1");
+        properties.add("spring.mail.port", () -> "1");
+        properties.add("spring.mail.username", () -> "synthetic");
+        properties.add("spring.mail.password", () -> "");
         properties.add("server.forward-headers-strategy", () -> "none");
         properties.add("spring.profiles.active", () -> "isolated-postgresql");
         properties.add("spring.profiles.include", () -> "");
@@ -86,6 +94,7 @@ class PostgresReleaseIntegrationTest {
     @Autowired ProductRepository products; @Autowired OrderRepository orders; @Autowired UserRepository users;
     @Autowired OrderService service; @Autowired OrderPlacementService placement; @Autowired CartService carts;
     @Autowired AccountSecurityService accounts; @Autowired PlatformTransactionManager manager;
+    @Autowired PasswordResetService passwordResets;
     @Autowired JwtUtil jwt; @Autowired PasswordEncoder passwords; @Autowired MockMvc mvc; @Autowired JdbcTemplate jdbc;
 
     private <T> T transaction(java.util.function.Supplier<T> action) { return new TransactionTemplate(manager).execute(status -> action.get()); }
@@ -104,6 +113,12 @@ class PostgresReleaseIntegrationTest {
         request.setAddress("Synthetic test address"); request.setPaymentMethod("COD"); request.setExpectedTotal(new BigDecimal("1350.00")); return request;
     }
     private String bearer(User user) { return "Bearer " + jwt.generateToken(user.getEmail(), user.getRole(), user.getSessionVersion()); }
+    private String resetToken(User user) {
+        PasswordResetService.Delivery delivery = passwordResets.issue(user.getEmail());
+        assertNotNull(delivery); assertEquals(user.getEmail(), delivery.email());
+        assertTrue(delivery.url().matches("https://[^?#]+/reset-password#token=[A-Za-z0-9_-]{43}"));
+        return delivery.url().substring(delivery.url().indexOf("#token=") + "#token=".length());
+    }
     private List<Object> race(Callable<?> first, Callable<?> second) throws Exception {
         try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
             CountDownLatch ready = new CountDownLatch(2), start = new CountDownLatch(1);
@@ -211,6 +226,62 @@ class PostgresReleaseIntegrationTest {
         User user = user("USER");
         List<Object> results = race(() -> { accounts.revokeSessionsForUser(user.getId()); return true; }, () -> { accounts.revokeSessionsForUser(user.getId()); return true; });
         assertEquals(List.of(true, true), results); assertEquals(2, users.findById(user.getId()).orElseThrow().getSessionVersion());
+    }
+
+    @Test void passwordResetMigrationPersistsOnlyDigestsAndPreservesAccountData() {
+        User customer = user("USER"); String oldHash = customer.getPassword(); String raw = resetToken(customer);
+        List<String> columns = jdbc.queryForList("select column_name from information_schema.columns where table_schema='public' and table_name='password_reset_tokens' order by ordinal_position", String.class);
+        assertEquals(List.of("token_hash", "user_id", "created_at", "expires_at", "used_at"), columns);
+        String stored = jdbc.queryForObject("select token_hash from password_reset_tokens where user_id=?", String.class, customer.getId());
+        assertEquals(PasswordResetService.hash(raw), stored); assertNotEquals(raw, stored); assertTrue(stored.matches("[0-9a-f]{64}"));
+        assertEquals(20 * 60, jdbc.queryForObject("select extract(epoch from (expires_at-created_at))::integer from password_reset_tokens where user_id=?", Integer.class, customer.getId()));
+        assertEquals(2, jdbc.queryForObject("select count(*) from pg_indexes where schemaname='public' and tablename='password_reset_tokens' and indexname in ('idx_password_reset_user','idx_password_reset_expiry')", Integer.class));
+        User unchanged = users.findById(customer.getId()).orElseThrow();
+        assertEquals(oldHash, unchanged.getPassword()); assertEquals(0, unchanged.getSessionVersion()); assertTrue(unchanged.isEnabled());
+    }
+
+    @Test void successfulPasswordResetRevokesActualJwtAndReplacesActualLoginPassword() throws Exception {
+        User customer = user("USER"); String oldBearer = bearer(customer), raw = resetToken(customer);
+        String replacement = "replacement-synthetic-password";
+        mvc.perform(get("/api/orders").header("Authorization", oldBearer)).andExpect(status().isOk());
+        passwordResets.reset(raw, replacement, replacement);
+        User current = users.findById(customer.getId()).orElseThrow();
+        assertEquals(1, current.getSessionVersion()); assertTrue(passwords.matches(replacement, current.getPassword()));
+        assertFalse(passwords.matches("synthetic-valid-test-password", current.getPassword()));
+        assertEquals(1, jdbc.queryForObject("select count(*) from password_reset_tokens where user_id=? and used_at is not null", Integer.class, customer.getId()));
+        mvc.perform(get("/api/orders").header("Authorization", oldBearer)).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/auth/login").contentType("application/json").content("{\"email\":\"" + customer.getEmail() + "\",\"password\":\"synthetic-valid-test-password\"}"))
+                .andExpect(status().isUnauthorized());
+        var login = mvc.perform(post("/api/auth/login").contentType("application/json").content("{\"email\":\"" + customer.getEmail() + "\",\"password\":\"" + replacement + "\"}"))
+                .andExpect(status().isOk()).andReturn();
+        var matcher = Pattern.compile("\\\"token\\\"\\s*:\\s*\\\"([A-Za-z0-9_.-]+)\\\"").matcher(login.getResponse().getContentAsString());
+        assertTrue(matcher.find());
+        mvc.perform(get("/api/orders").header("Authorization", "Bearer " + matcher.group(1))).andExpect(status().isOk());
+        assertEquals(400, assertThrows(ResponseStatusException.class, () -> passwordResets.reset(raw, "another-synthetic-password", "another-synthetic-password")).getStatusCode().value());
+        assertEquals(1, users.findById(customer.getId()).orElseThrow().getSessionVersion());
+    }
+
+    @RepeatedTest(3) void concurrentUseOfSamePasswordResetTokenHasExactlyOneWinnerOnPostgresql() throws Exception {
+        User customer = user("USER"); String raw = resetToken(customer);
+        assertSinglePasswordResetWinner(customer, raw, raw);
+    }
+
+    @RepeatedTest(3) void concurrentUseOfDifferentPasswordResetTokensForOneAccountHasExactlyOneWinnerOnPostgresql() throws Exception {
+        User customer = user("USER"); String first = resetToken(customer), second = resetToken(customer);
+        assertNotEquals(first, second); assertSinglePasswordResetWinner(customer, first, second);
+    }
+
+    private void assertSinglePasswordResetWinner(User customer, String firstToken, String secondToken) throws Exception {
+        List<Object> results = race(() -> { passwordResets.reset(firstToken, "synthetic-first-password", "synthetic-first-password"); return "first"; },
+                () -> { passwordResets.reset(secondToken, "synthetic-second-password", "synthetic-second-password"); return "second"; });
+        assertEquals(1, results.stream().filter(String.class::isInstance).count());
+        assertEquals(1, results.stream().filter(ResponseStatusException.class::isInstance).count());
+        ResponseStatusException rejected = (ResponseStatusException) results.stream().filter(ResponseStatusException.class::isInstance).findFirst().orElseThrow();
+        assertEquals(400, rejected.getStatusCode().value()); assertEquals(PasswordResetService.INVALID_LINK, rejected.getReason());
+        User current = users.findById(customer.getId()).orElseThrow(); assertEquals(1, current.getSessionVersion());
+        String winner = (String) results.stream().filter(String.class::isInstance).findFirst().orElseThrow();
+        assertTrue(passwords.matches("first".equals(winner) ? "synthetic-first-password" : "synthetic-second-password", current.getPassword()));
+        assertEquals(0, jdbc.queryForObject("select count(*) from password_reset_tokens where user_id=? and used_at is null", Integer.class, customer.getId()));
     }
 
     @Test void actualSecurityChainAllowsExactCorsAndIdempotencyHeaderOnly() throws Exception {

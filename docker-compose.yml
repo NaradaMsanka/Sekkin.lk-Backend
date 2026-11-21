@@ -24,7 +24,17 @@ services:
       SPRING_DATASOURCE_PASSWORD: cosmetic_password
       JWT_SECRET: ${JWT_SECRET:?Set a private JWT_SECRET of at least 32 bytes before starting Compose}
       CHECKOUT_ENABLED: ${CHECKOUT_ENABLED:-false}
-      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_HIBERNATE_DDL_AUTO: ${JPA_DDL_AUTO:-validate}
+      PASSWORD_RESET_ENABLED: ${PASSWORD_RESET_ENABLED:-false}
+      PASSWORD_RESET_FRONTEND_URL: ${PASSWORD_RESET_FRONTEND_URL:-https://www.sekkin.lk}
+      PASSWORD_RESET_FROM: ${PASSWORD_RESET_FROM:-no-reply@sekkin.lk}
+      SMTP_HOST: ${SMTP_HOST:-smtp.resend.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-resend}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_CONNECTION_TIMEOUT_MS: ${SMTP_CONNECTION_TIMEOUT_MS:-5000}
+      SMTP_READ_TIMEOUT_MS: ${SMTP_READ_TIMEOUT_MS:-5000}
+      SMTP_WRITE_TIMEOUT_MS: ${SMTP_WRITE_TIMEOUT_MS:-5000}
     depends_on:
       - postgres
 
