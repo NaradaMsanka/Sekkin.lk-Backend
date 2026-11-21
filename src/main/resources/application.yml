@@ -16,6 +16,22 @@ server:
   port: ${PORT:8080}
 
 spring:
+  mail:
+    host: ${SMTP_HOST:smtp.resend.com}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:resend}
+    password: ${SMTP_PASSWORD:}
+    default-encoding: UTF-8
+    test-connection: false
+    properties:
+      "[mail.smtp.auth]": true
+      "[mail.smtp.starttls.enable]": true
+      "[mail.smtp.starttls.required]": true
+      "[mail.smtp.ssl.checkserveridentity]": true
+      "[mail.smtp.connectiontimeout]": ${SMTP_CONNECTION_TIMEOUT_MS:5000}
+      "[mail.smtp.timeout]": ${SMTP_READ_TIMEOUT_MS:5000}
+      "[mail.smtp.writetimeout]": ${SMTP_WRITE_TIMEOUT_MS:5000}
+      "[mail.debug]": false
   application:
     name: cosmetic-ecommerce
   datasource:
@@ -38,6 +54,10 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
 app:
+  password-reset:
+    enabled: ${PASSWORD_RESET_ENABLED:false}
+    frontend-url: ${PASSWORD_RESET_FRONTEND_URL:https://www.sekkin.lk}
+    from: ${PASSWORD_RESET_FROM:no-reply@sekkin.lk}
   checkout:
     enabled: ${CHECKOUT_ENABLED:false}
   cors:

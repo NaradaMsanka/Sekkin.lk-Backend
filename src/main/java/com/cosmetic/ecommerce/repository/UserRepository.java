@@ -9,6 +9,13 @@ public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByEmail(String email); // Email එක කලින්ම තියෙනවද බලන්න
     User findByEmail(String email);
 
+    @org.springframework.data.jpa.repository.Query("select u.id from User u where lower(u.email) = lower(:email)")
+    java.util.List<Long> findIdsByEmailIgnoreCase(@org.springframework.data.repository.query.Param("email") String email);
+
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("select u from User u where u.id = :id")
+    java.util.Optional<User> findByIdForUpdate(@org.springframework.data.repository.query.Param("id") Long id);
+
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @org.springframework.data.jpa.repository.Query("select u from User u where u.email = :email")
     User findByEmailForUpdate(@org.springframework.data.repository.query.Param("email") String email);

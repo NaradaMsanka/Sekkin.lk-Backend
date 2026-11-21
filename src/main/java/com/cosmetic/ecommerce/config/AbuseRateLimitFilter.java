@@ -23,6 +23,11 @@ public class AbuseRateLimitFilter extends OncePerRequestFilter {
             int limit = 30;
             Duration window = Duration.ofMinutes(5);
             if ("/api/auth/login".equals(path)) scope = "login-ip";
+            else if ("/api/auth/forgot-password".equals(path)) {
+                scope = "forgot-password-ip"; limit = 10; window = Duration.ofMinutes(15);
+            } else if ("/api/auth/reset-password".equals(path)) {
+                scope = "reset-password-ip"; limit = 20; window = Duration.ofMinutes(15);
+            }
             else if ("/api/auth/register".equals(path)) {
                 scope = "register-ip"; limit = 10; window = Duration.ofHours(1);
             } else if ("/api/orders/direct".equals(path) || "/api/orders".equals(path)) {
