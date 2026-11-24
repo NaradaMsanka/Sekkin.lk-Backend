@@ -51,6 +51,62 @@ class AuthorizationBoundaryTest {
     }
     private String bearer(String role) { return "Bearer " + jwt.generateToken("auth-fixture@example.test", role); }
 
+    private String directCheckoutBody() {
+        return """
+                {"productId":1,"quantity":1,"name":"Synthetic buyer","phoneNumber":"0000000000",
+                "address":"Synthetic address","email":"other@example.test","paymentMethod":"COD","expectedTotal":1400}
+                """;
+    }
+
+    @Test void everyCheckoutRouteRejectsAnonymousRequestsBeforePlacement() throws Exception {
+        for (String route : new String[]{"/api/orders", "/api/orders/direct"}) {
+            mvc.perform(post(route).header("Idempotency-Key", java.util.UUID.randomUUID().toString())
+                            .contentType("application/json").content(directCheckoutBody()))
+                    .andExpect(status().isUnauthorized());
+        }
+        verifyNoInteractions(placement, orders, users);
+    }
+
+    @Test void invalidExpiredDisabledAndRevokedSessionsCannotPlaceDirectOrders() throws Exception {
+        String expired = Jwts.builder().setSubject("auth-fixture@example.test").claim("sv", 0)
+                .setExpiration(new Date(System.currentTimeMillis() - 60000))
+                .signWith(Keys.hmacShaKeyFor("synthetic-authorization-test-key-0000000000".getBytes(StandardCharsets.UTF_8)), SignatureAlgorithm.HS256).compact();
+        String forged = new JwtUtil("different-synthetic-test-key-000000000000").generateToken("auth-fixture@example.test", "USER");
+        for (String token : new String[]{"bad-token", expired, forged}) {
+            mvc.perform(post("/api/orders/direct").header("Authorization", "Bearer " + token)
+                            .header("Idempotency-Key", java.util.UUID.randomUUID().toString()).contentType("application/json").content(directCheckoutBody()))
+                    .andExpect(status().isUnauthorized());
+        }
+        mvc.perform(post("/api/orders/direct").header("Authorization", bearer("USER"))
+                        .header("Idempotency-Key", java.util.UUID.randomUUID().toString()).contentType("application/json").content(directCheckoutBody()))
+                .andExpect(status().isUnauthorized());
+        User account = user("USER"); account.setEnabled(false); when(users.findByEmail(account.getEmail())).thenReturn(account);
+        String token = bearer("USER");
+        mvc.perform(post("/api/orders/direct").header("Authorization", token)
+                        .header("Idempotency-Key", java.util.UUID.randomUUID().toString()).contentType("application/json").content(directCheckoutBody()))
+                .andExpect(status().isUnauthorized());
+        account.setEnabled(true); account.setSessionVersion(1);
+        mvc.perform(post("/api/orders/direct").header("Authorization", token)
+                        .header("Idempotency-Key", java.util.UUID.randomUUID().toString()).contentType("application/json").content(directCheckoutBody()))
+                .andExpect(status().isUnauthorized());
+        verifyNoInteractions(placement, orders);
+    }
+
+    @Test void signedInDirectCheckoutUsesThePrincipalInsteadOfTheContactEmail() throws Exception {
+        User account = user("USER"); when(users.findByEmail(account.getEmail())).thenReturn(account);
+        var product = new com.cosmetic.ecommerce.entity.Product(); product.setName("Synthetic product");
+        var item = new com.cosmetic.ecommerce.entity.OrderItem(); item.setProduct(product); item.setQuantity(1); item.setPrice(1000.0);
+        var order = new com.cosmetic.ecommerce.entity.Order(); order.setId(1L); order.setUser(account);
+        order.setDeliveryCharge(400.0); order.setTotalAmount(1400.0); order.setDiscountAmount(0.0);
+        order.setPaymentMethod("COD"); order.setPaymentStatus("PENDING_COD"); order.setStatus("PENDING"); order.getOrderItems().add(item);
+        when(placement.placeDirect(any(), any(), eq(account.getEmail()))).thenReturn(order);
+        String key = java.util.UUID.randomUUID().toString();
+        mvc.perform(post("/api/orders/direct").header("Authorization", bearer("USER")).header("Idempotency-Key", key)
+                        .contentType("application/json").content(directCheckoutBody()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.orderId").value(1)).andExpect(jsonPath("$.totalAmount").value(1400));
+        verify(placement).placeDirect(eq(key), any(), eq("auth-fixture@example.test"));
+    }
+
     @Test void signedTokenRoleCannotOverrideTheCurrentAccountRole() throws Exception {
         when(users.findByEmail("auth-fixture@example.test")).thenReturn(user("USER"));
         mvc.perform(get("/api/admin/dashboard").header("Authorization", bearer("ADMIN"))).andExpect(status().isForbidden());
@@ -201,9 +257,10 @@ class AuthorizationBoundaryTest {
         assertFalse(output.getAll().contains("synthetic-sensitive-account-operation"));
     }
 
-    @Test void extremePublicExpectedTotalIsRejectedBeforePlacement() throws Exception {
+    @Test void extremeAuthenticatedExpectedTotalIsRejectedBeforePlacement() throws Exception {
+        when(users.findByEmail("auth-fixture@example.test")).thenReturn(user("USER"));
         for (String amount : new String[]{"1e1000000", "1e-1000000"}) {
-            mvc.perform(post("/api/orders/direct").header("Idempotency-Key", java.util.UUID.randomUUID().toString())
+            mvc.perform(post("/api/orders/direct").header("Authorization", bearer("USER")).header("Idempotency-Key", java.util.UUID.randomUUID().toString())
                     .contentType("application/json").content("{\"productId\":1,\"quantity\":1,\"name\":\"Synthetic\",\"phoneNumber\":\"000\","
                             + "\"address\":\"Synthetic address\",\"email\":\"fixture@example.test\",\"paymentMethod\":\"COD\",\"expectedTotal\":" + amount + "}"))
                     .andExpect(status().isBadRequest());

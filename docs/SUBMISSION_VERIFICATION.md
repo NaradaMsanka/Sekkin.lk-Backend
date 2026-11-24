@@ -30,7 +30,7 @@ The launcher started the backend on loopback with a new in-memory H2 database, r
 6. Order visibility in the customer's authenticated history.
 7. Administrator acceptance, shipping, delivery and separate simulated COD collection; collection updates revenue reporting.
 8. Delivered-purchase review eligibility, review submission and omission of customer email from public reviews.
-9. Guest direct COD checkout and cancellation with restored stock.
+9. Signed-in direct COD checkout and cancellation with restored stock; anonymous checkout must return 401 without creating an order or reserving stock.
 
 All checks passed. Payment collection was a synthetic local state transition; no gateway, courier or bank was contacted.
 

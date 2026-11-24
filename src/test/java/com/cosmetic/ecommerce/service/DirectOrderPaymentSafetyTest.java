@@ -4,6 +4,7 @@ import com.cosmetic.ecommerce.controller.OrderController;
 import com.cosmetic.ecommerce.dto.DirectOrderRequestDTO;
 import com.cosmetic.ecommerce.entity.Order;
 import com.cosmetic.ecommerce.entity.Product;
+import com.cosmetic.ecommerce.entity.User;
 import com.cosmetic.ecommerce.repository.OrderRepository;
 import com.cosmetic.ecommerce.repository.ProductRepository;
 import com.cosmetic.ecommerce.repository.UserRepository;
@@ -46,7 +47,7 @@ class DirectOrderPaymentSafetyTest {
     @ParameterizedTest @NullAndEmptySource
     @ValueSource(strings = {"CARD", "KOKO", " card ", "PAID", "BANK_TRANSFER"})
     void rejectsUnsupportedPaymentsBeforeInventoryOrOrdersAreTouched(String method) {
-        ResponseStatusException error = assertThrows(ResponseStatusException.class, () -> service.createDirectOrder(request(method), null));
+        ResponseStatusException error = assertThrows(ResponseStatusException.class, () -> service.createDirectOrder(request(method), "buyer@example.test"));
         assertEquals(HttpStatus.BAD_REQUEST, error.getStatusCode());
         verifyNoInteractions(orders, products, users, carts);
     }
@@ -57,10 +58,12 @@ class DirectOrderPaymentSafetyTest {
         when(products.findByIdForUpdate(2L)).thenReturn(Optional.of(product));
         when(orders.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
         DirectOrderRequestDTO request = request(" cod "); request.setCouponCode("GLOW10");
-        Order order = service.createDirectOrder(request, null);
+        User account = new User(); account.setEmail("buyer@example.test");
+        when(users.findByEmailForUpdate(account.getEmail())).thenReturn(account);
+        Order order = service.createDirectOrder(request, account.getEmail());
         assertEquals("COD", order.getPaymentMethod()); assertEquals("PENDING_COD", order.getPaymentStatus());
-        assertEquals("PENDING", order.getStatus()); assertEquals(350.0, order.getDeliveryCharge());
-        assertEquals(3950.0, order.getTotalAmount()); assertEquals(3, product.getStockQuantity());
+        assertEquals("PENDING", order.getStatus()); assertEquals(400.0, order.getDeliveryCharge());
+        assertEquals(4000.0, order.getTotalAmount()); assertEquals(3, product.getStockQuantity());
         assertEquals(2, order.getOrderItems().getFirst().getQuantity());
         verify(orders).saveAndFlush(order);
     }

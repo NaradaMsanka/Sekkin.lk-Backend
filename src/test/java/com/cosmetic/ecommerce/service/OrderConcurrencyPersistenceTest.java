@@ -36,6 +36,8 @@ class OrderConcurrencyPersistenceTest {
     @Autowired ProductRepository products; @Autowired OrderRepository orders; @Autowired UserRepository users;
     @Autowired CartRepository carts; @Autowired OrderService service; @Autowired OrderPlacementService placement;
     @Autowired PlatformTransactionManager manager;
+    private User checkoutUser;
+    @org.junit.jupiter.api.BeforeEach void signInCheckoutCustomer() { checkoutUser = account(); }
 
     private <T> T tx(java.util.function.Supplier<T> action) { return new TransactionTemplate(manager).execute(status -> action.get()); }
     private Product product(int stock) {
@@ -45,7 +47,7 @@ class OrderConcurrencyPersistenceTest {
     private DirectOrderRequestDTO request(Product product) {
         DirectOrderRequestDTO request = new DirectOrderRequestDTO(); request.setProductId(product.getId()); request.setQuantity(1);
         request.setName("Isolated buyer"); request.setEmail("guest@example.test"); request.setPhoneNumber("test phone");
-        request.setAddress("Isolated address"); request.setPaymentMethod("COD"); request.setExpectedTotal(new BigDecimal("1350.00")); return request;
+        request.setAddress("Isolated address"); request.setPaymentMethod("COD"); request.setExpectedTotal(new BigDecimal("1400.00")); return request;
     }
     private List<Object> simultaneously(Callable<Order> first, Callable<Order> second) throws Exception {
         ExecutorService pool = Executors.newFixedThreadPool(2); CountDownLatch ready = new CountDownLatch(2), start = new CountDownLatch(1);
@@ -62,8 +64,8 @@ class OrderConcurrencyPersistenceTest {
 
     @Test void twoIndependentCheckoutsCannotOversellTheLastUnit() throws Exception {
         Product product = product(1); long before = orders.count();
-        List<Object> results = simultaneously(() -> placement.placeDirect(UUID.randomUUID().toString(), request(product), null),
-                () -> placement.placeDirect(UUID.randomUUID().toString(), request(product), null));
+        List<Object> results = simultaneously(() -> placement.placeDirect(UUID.randomUUID().toString(), request(product), checkoutUser.getEmail()),
+                () -> placement.placeDirect(UUID.randomUUID().toString(), request(product), checkoutUser.getEmail()));
         assertEquals(1, results.stream().filter(Order.class::isInstance).count());
         assertEquals(1, results.stream().filter(ResponseStatusException.class::isInstance).count());
         assertEquals(0, products.findById(product.getId()).orElseThrow().getStockQuantity()); assertEquals(before + 1, orders.count());
@@ -72,32 +74,45 @@ class OrderConcurrencyPersistenceTest {
     @ParameterizedTest @ValueSource(ints = {1, 2})
     void concurrentIdenticalRetriesCreateOneOrderAndReserveOnce(int stock) throws Exception {
         Product product = product(stock); long before = orders.count(); String key = UUID.randomUUID().toString();
-        List<Object> results = simultaneously(() -> placement.placeDirect(key, request(product), null), () -> placement.placeDirect(key, request(product), null));
+        List<Object> results = simultaneously(() -> placement.placeDirect(key, request(product), checkoutUser.getEmail()), () -> placement.placeDirect(key, request(product), checkoutUser.getEmail()));
         assertTrue(results.stream().allMatch(Order.class::isInstance));
         assertEquals(((Order) results.get(0)).getId(), ((Order) results.get(1)).getId());
         assertEquals(stock - 1, products.findById(product.getId()).orElseThrow().getStockQuantity()); assertEquals(before + 1, orders.count());
         // Retries return the original receipt instead of repricing or consuming stock again.
         tx(() -> { Product changed = products.findByIdForUpdate(product.getId()).orElseThrow(); changed.setPrice(new BigDecimal("2000")); return products.save(changed); });
-        Order replay = placement.placeDirect(key, request(product), null);
-        assertEquals(1350.0, replay.getTotalAmount()); assertEquals(350.0, replay.getDeliveryCharge());
+        Order replay = placement.placeDirect(key, request(product), checkoutUser.getEmail());
+        assertEquals(1400.0, replay.getTotalAmount()); assertEquals(400.0, replay.getDeliveryCharge());
     }
 
     @Test void changedIntentOrInvalidKeysCannotReuseAnAttempt() {
-        Product product = product(4); String key = UUID.randomUUID().toString(); Order first = placement.placeDirect(key, request(product), null);
+        Product product = product(4); String key = UUID.randomUUID().toString(); Order first = placement.placeDirect(key, request(product), checkoutUser.getEmail());
         DirectOrderRequestDTO altered = request(product); altered.setAddress("Different address");
-        assertEquals(409, assertThrows(ResponseStatusException.class, () -> placement.placeDirect(key, altered, null)).getStatusCode().value());
+        assertEquals(409, assertThrows(ResponseStatusException.class, () -> placement.placeDirect(key, altered, checkoutUser.getEmail())).getStatusCode().value());
         assertEquals(3, products.findById(product.getId()).orElseThrow().getStockQuantity());
         for (String bad : List.of("short", "00000000-0000-1000-8000-000000000000", "00000000-0000-4000-0000-000000000000"))
-            assertEquals(400, assertThrows(ResponseStatusException.class, () -> placement.placeDirect(bad, request(product), null)).getStatusCode().value());
-        assertEquals(first.getId(), placement.placeDirect(key, request(product), null).getId());
+            assertEquals(400, assertThrows(ResponseStatusException.class, () -> placement.placeDirect(bad, request(product), checkoutUser.getEmail())).getStatusCode().value());
+        assertEquals(first.getId(), placement.placeDirect(key, request(product), checkoutUser.getEmail()).getId());
     }
 
-    @Test void guestEmailNeverCreatesAccountOwnershipAndDifferentActorsHaveIndependentKeys() {
+    @Test void signedInAccountsHaveIndependentKeysAndContactEmailCannotClaimOwnership() {
         Product product = product(4); User user = account(); DirectOrderRequestDTO request = request(product); request.setEmail(user.getEmail());
-        String key = UUID.randomUUID().toString(); Order guest = placement.placeDirect(key, request, null);
-        assertNull(guest.getUser()); Order signedIn = placement.placeDirect(key, request, user.getEmail());
-        assertNotEquals(guest.getId(), signedIn.getId());
+        String key = UUID.randomUUID().toString(); Order first = placement.placeDirect(key, request, checkoutUser.getEmail());
+        Order signedIn = placement.placeDirect(key, request, user.getEmail());
+        assertNotEquals(first.getId(), signedIn.getId());
+        assertEquals(checkoutUser.getId(), tx(() -> orders.findById(first.getId()).orElseThrow().getUser().getId()));
         assertEquals(user.getId(), tx(() -> orders.findById(signedIn.getId()).orElseThrow().getUser().getId()));
+    }
+
+    @Test void anonymousAndDisabledCustomersCannotCreateOrdersOrReserveInventory() {
+        Product product = product(2); long before = orders.count();
+        for (String email : new String[]{null, "", "anonymousUser"}) {
+            assertEquals(401, assertThrows(ResponseStatusException.class,
+                    () -> placement.placeDirect(UUID.randomUUID().toString(), request(product), email)).getStatusCode().value());
+        }
+        tx(() -> { User disabled = users.findById(checkoutUser.getId()).orElseThrow(); disabled.setEnabled(false); return users.saveAndFlush(disabled); });
+        assertEquals(401, assertThrows(ResponseStatusException.class,
+                () -> placement.placeDirect(UUID.randomUUID().toString(), request(product), checkoutUser.getEmail())).getStatusCode().value());
+        assertEquals(before, orders.count()); assertEquals(2, products.findById(product.getId()).orElseThrow().getStockQuantity());
     }
 
     private User account() {
@@ -112,7 +127,7 @@ class OrderConcurrencyPersistenceTest {
         });
         CartOrderRequestDTO request = new CartOrderRequestDTO(); request.setShippingAddress("Isolated cart address");
         request.setCustomerPhone("test phone");
-        request.setExpectedTotal(new BigDecimal("1350")); request.setCartItems(List.of(new CartOrderRequestDTO.CartLine(product.getId(), 1))); return request;
+        request.setExpectedTotal(new BigDecimal("1400")); request.setCartItems(List.of(new CartOrderRequestDTO.CartLine(product.getId(), 1))); return request;
     }
 
     @Test void authenticatedCartRetryReplaysAfterCartIsCleared() {
@@ -132,22 +147,22 @@ class OrderConcurrencyPersistenceTest {
     }
 
     @Test void concurrentCancellationRestoresOnlyOneReservation() throws Exception {
-        Product product = product(2); Order created = placement.placeDirect(UUID.randomUUID().toString(), request(product), null);
+        Product product = product(2); Order created = placement.placeDirect(UUID.randomUUID().toString(), request(product), checkoutUser.getEmail());
         List<Object> results = simultaneously(() -> service.updateOrderStatus(created.getId(), "CANCELLED"), () -> service.updateOrderStatus(created.getId(), "CANCELLED"));
         assertTrue(results.stream().allMatch(Order.class::isInstance));
         assertEquals(2, products.findById(product.getId()).orElseThrow().getStockQuantity());
-        Order saved = orders.findById(created.getId()).orElseThrow(); assertFalse(saved.getInventoryReserved()); assertEquals(1350.0, saved.getTotalAmount());
+        Order saved = orders.findById(created.getId()).orElseThrow(); assertFalse(saved.getInventoryReserved()); assertEquals(1400.0, saved.getTotalAmount());
     }
 
     @Test void extremeDisplayedTotalsAreRejectedWithoutCreatingRecords() {
         Product product = product(2); DirectOrderRequestDTO request = request(product); request.setExpectedTotal(new BigDecimal("1e100000000"));
         long before = orders.count();
-        assertEquals(400, assertThrows(ResponseStatusException.class, () -> placement.placeDirect(UUID.randomUUID().toString(), request, null)).getStatusCode().value());
+        assertEquals(400, assertThrows(ResponseStatusException.class, () -> placement.placeDirect(UUID.randomUUID().toString(), request, checkoutUser.getEmail())).getStatusCode().value());
         assertEquals(before, orders.count()); assertEquals(2, products.findById(product.getId()).orElseThrow().getStockQuantity());
     }
 
     @Test void concurrentAcceptanceKeepsOneConfirmationAuditAndDoesNotChargePayment() throws Exception {
-        Product product = product(2); Order created = placement.placeDirect(UUID.randomUUID().toString(), request(product), null);
+        Product product = product(2); Order created = placement.placeDirect(UUID.randomUUID().toString(), request(product), checkoutUser.getEmail());
         List<Object> results = simultaneously(() -> service.acceptOrder(created.getId(), "manual-confirmation", "first-admin@example.test"),
                 () -> service.acceptOrder(created.getId(), "manual-confirmation", "second-admin@example.test"));
         assertTrue(results.stream().allMatch(Order.class::isInstance));
@@ -158,16 +173,16 @@ class OrderConcurrencyPersistenceTest {
     }
 
     @Test void concurrentCollectionConfirmsOneAuditWithoutOverwritingItsOperator() throws Exception {
-        Product product = product(2); Order created = placement.placeDirect(UUID.randomUUID().toString(), request(product), null);
+        Product product = product(2); Order created = placement.placeDirect(UUID.randomUUID().toString(), request(product), checkoutUser.getEmail());
         service.acceptOrder(created.getId(), "manual-confirmation", "admin@example.test");
         service.updateOrderStatus(created.getId(), "SHIPPED"); service.updateOrderStatus(created.getId(), "DELIVERED");
-        List<Object> results = simultaneously(() -> service.recordCodCollection(created.getId(), new BigDecimal("1350"), "courier-settlement-001", "first-admin@example.test"),
-                () -> service.recordCodCollection(created.getId(), new BigDecimal("1350"), "courier-settlement-001", "second-admin@example.test"));
+        List<Object> results = simultaneously(() -> service.recordCodCollection(created.getId(), new BigDecimal("1400"), "courier-settlement-001", "first-admin@example.test"),
+                () -> service.recordCodCollection(created.getId(), new BigDecimal("1400"), "courier-settlement-001", "second-admin@example.test"));
         assertTrue(results.stream().allMatch(Order.class::isInstance));
         Order saved = orders.findById(created.getId()).orElseThrow(); assertEquals("PAID", saved.getPaymentStatus());
         assertNotNull(saved.getCodCollectedAt()); assertEquals("courier-settlement-001", saved.getCodCollectionReference());
         assertTrue(Set.of("first-admin@example.test", "second-admin@example.test").contains(saved.getCodCollectedBy()));
-        assertEquals(1350.0, saved.getTotalAmount()); assertEquals(350.0, saved.getDeliveryCharge());
+        assertEquals(1400.0, saved.getTotalAmount()); assertEquals(400.0, saved.getDeliveryCharge());
         assertEquals(1, products.findById(product.getId()).orElseThrow().getStockQuantity());
     }
 }

@@ -42,9 +42,9 @@ class OrderShippingPersistenceTest {
         DirectOrderRequestDTO request = new DirectOrderRequestDTO(); request.setProductId(product.getId());
         request.setQuantity(2); request.setPaymentMethod("COD"); request.setCouponCode("SAVE500");
         request.setEmail("fixture@example.test"); request.setAddress("Test address");
-        Order direct = service.createDirectOrder(request, null);
         User user = new User(); user.setName("Fixture"); user.setEmail("cart@example.test");
         user.setPassword("synthetic-test-only"); user.setRole("USER"); user = users.saveAndFlush(user);
+        Order direct = service.createDirectOrder(request, user.getEmail());
         Cart cart = new Cart(); cart.setUser(user); CartItem item = new CartItem();
         item.setProduct(product); item.setQuantity(2); cart.getItems().add(item);
         when(carts.getCart("cart@example.test")).thenReturn(cart);
@@ -52,7 +52,7 @@ class OrderShippingPersistenceTest {
         orders.flush(); entityManager.clear();
         for (long id : new long[]{direct.getId(), normal.getId()}) {
             Order persisted = orders.findById(id).orElseThrow();
-            assertEquals(350.0, persisted.getDeliveryCharge()); assertEquals(4850.0, persisted.getTotalAmount());
+            assertEquals(400.0, persisted.getDeliveryCharge()); assertEquals(4900.0, persisted.getTotalAmount());
             assertEquals(500.0, persisted.getDiscountAmount()); assertEquals(2500.0, persisted.getOrderItems().getFirst().getPrice());
         }
         Order unchanged = orders.findById(historicalId).orElseThrow();

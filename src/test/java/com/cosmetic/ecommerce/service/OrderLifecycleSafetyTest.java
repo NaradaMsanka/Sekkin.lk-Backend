@@ -29,13 +29,15 @@ class OrderLifecycleSafetyTest {
     }
 
     @Test void checkoutIsAnUnacceptedRequestAndQuoteChangesNeverReserveInventory() {
+        User account = new User(); account.setEmail("buyer@example.test");
+        when(users.findByEmailForUpdate(account.getEmail())).thenReturn(account);
         Product p = product(3); when(products.findByIdForUpdate(2L)).thenReturn(Optional.of(p));
         DirectOrderRequestDTO request = new DirectOrderRequestDTO(); request.setProductId(2L); request.setQuantity(1); request.setPaymentMethod("COD");
         request.setExpectedTotal(new BigDecimal("1000"));
-        ResponseStatusException changed = assertThrows(ResponseStatusException.class, () -> service.createDirectOrder(request, null));
+        ResponseStatusException changed = assertThrows(ResponseStatusException.class, () -> service.createDirectOrder(request, account.getEmail()));
         assertEquals(409, changed.getStatusCode().value()); assertEquals(3, p.getStockQuantity()); verifyNoInteractions(orders);
-        request.setExpectedTotal(new BigDecimal("1350")); when(orders.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
-        Order created = service.createDirectOrder(request, null);
+        request.setExpectedTotal(new BigDecimal("1400")); when(orders.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
+        Order created = service.createDirectOrder(request, account.getEmail());
         assertEquals("PENDING", created.getStatus()); assertEquals("PENDING_COD", created.getPaymentStatus());
         assertTrue(created.getInventoryReserved()); assertNull(created.getAcceptedAt()); assertEquals(2, p.getStockQuantity());
     }
@@ -111,11 +113,13 @@ class OrderLifecycleSafetyTest {
     }
 
     @Test void valuesThatCannotPreserveStoredCentsAreRejectedBeforeInventoryChanges() {
+        User account = new User(); account.setEmail("buyer@example.test");
+        when(users.findByEmailForUpdate(account.getEmail())).thenReturn(account);
         Product product = product(2); product.setPrice(new BigDecimal("999999999999000.99"));
         when(products.findByIdForUpdate(2L)).thenReturn(Optional.of(product));
         DirectOrderRequestDTO request = new DirectOrderRequestDTO(); request.setProductId(2L); request.setQuantity(1); request.setPaymentMethod("COD");
         request.setExpectedTotal(new BigDecimal("999999999999350.99"));
-        assertEquals(400, assertThrows(ResponseStatusException.class, () -> service.createDirectOrder(request, null)).getStatusCode().value());
+        assertEquals(400, assertThrows(ResponseStatusException.class, () -> service.createDirectOrder(request, account.getEmail())).getStatusCode().value());
         assertEquals(2, product.getStockQuantity()); verify(products, never()).save(any()); verifyNoInteractions(orders);
     }
 }

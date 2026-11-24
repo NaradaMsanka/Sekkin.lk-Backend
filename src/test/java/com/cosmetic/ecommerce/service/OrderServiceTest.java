@@ -104,8 +104,8 @@ public class OrderServiceTest {
         Order createdOrder = orderService.createOrder(userEmail, address);
 
         // 3. ප්‍රතිඵල තහවුරු කිරීම (Asserts)
-        assertEquals(4350.0, createdOrder.getTotalAmount());
-        assertEquals(350.0, createdOrder.getDeliveryCharge());
+        assertEquals(4400.0, createdOrder.getTotalAmount());
+        assertEquals(400.0, createdOrder.getDeliveryCharge());
         assertEquals("PENDING", createdOrder.getStatus());
         assertEquals(1, createdOrder.getOrderItems().size());
 

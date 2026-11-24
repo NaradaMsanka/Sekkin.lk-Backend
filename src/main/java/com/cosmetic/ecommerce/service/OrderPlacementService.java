@@ -35,7 +35,7 @@ public class OrderPlacementService {
     public Order placeDirect(String key, DirectOrderRequestDTO request, String email) {
         requireCheckoutEnabled();
         requireExpectedTotal(request.getExpectedTotal());
-        String actor = actor(email, false);
+        String actor = actor(email);
         String scope = hash(canonical("DIRECT", actor, validateKey(key)));
         String fingerprint = hash(canonical(request.getProductId(), request.getQuantity(), request.getName(), request.getPhoneNumber(),
                 request.getAddress(), request.getPostalCode(), request.getEmail(), normalize(request.getPaymentMethod()),
@@ -46,7 +46,7 @@ public class OrderPlacementService {
     public Order placeCart(String key, CartOrderRequestDTO request, String email) {
         requireCheckoutEnabled();
         requireExpectedTotal(request.getExpectedTotal());
-        String actor = actor(email, true);
+        String actor = actor(email);
         String scope = hash(canonical("CART", actor, validateKey(key)));
         if (request.getCartItems() == null || request.getCartItems().isEmpty()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Displayed cart items are required");
         java.util.SortedMap<Long, Long> intendedItems = new java.util.TreeMap<>();
@@ -94,13 +94,12 @@ public class OrderPlacementService {
         if (!fingerprint.equals(order.getRequestFingerprint())) throw new ResponseStatusException(HttpStatus.CONFLICT, "This checkout attempt was already used with different details. Start a new attempt.");
         return order;
     }
-    private String actor(String email, boolean required) {
+    private String actor(String email) {
         if (email == null || email.isBlank() || "anonymousUser".equals(email)) {
-            if (required) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sign in required");
-            return "GUEST";
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sign in required");
         }
         User user = users.findByEmail(email);
-        if (user == null || user.getId() == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Account unavailable");
+        if (user == null || user.getId() == null || !user.isEnabled()) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Account unavailable");
         return "USER:" + user.getId();
     }
     private String validateKey(String key) {

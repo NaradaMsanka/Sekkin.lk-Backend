@@ -8,7 +8,7 @@ import java.util.Locale;
 
 /** Shared new-order pricing. Historical orders always use their stored amounts. */
 public final class OrderPricing {
-    public static final BigDecimal DELIVERY_CHARGE = new BigDecimal("350.00");
+    public static final BigDecimal DELIVERY_CHARGE = new BigDecimal("400.00");
     private OrderPricing() {}
 
     public record Line(Product product, Integer quantity) {}
