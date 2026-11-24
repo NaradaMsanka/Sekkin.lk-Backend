@@ -27,7 +27,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(controllers = {AdminController.class, AuthController.class, OrderController.class,
-        ProductController.class, CategoryController.class, FileUploadController.class},
+        ProductController.class, CategoryController.class, FileUploadController.class, PromotionController.class, CheckoutQuoteController.class},
         properties = "security.jwt.secret=synthetic-authorization-test-key-0000000000")
 @Import({SecurityConfig.class, JwtFilter.class, JwtUtil.class, RequestValidationAdvice.class})
 @ExtendWith(OutputCaptureExtension.class)
@@ -45,11 +45,64 @@ class AuthorizationBoundaryTest {
     @MockBean UserService registrations;
     @MockBean AccountSecurityService accountSecurity;
     @MockBean RequestThrottle throttle;
+    @MockBean PromotionService promotions;
+    @MockBean CheckoutQuoteService quotes;
 
     private User user(String role) {
         User user = new User(); user.setEmail("auth-fixture@example.test"); user.setRole(role); return user;
     }
     private String bearer(String role) { return "Bearer " + jwt.generateToken("auth-fixture@example.test", role); }
+
+    @Test void promoManagementRequiresAdminForEveryOperation() throws Exception {
+        for (boolean authenticated : new boolean[]{false, true}) {
+            if (authenticated) when(users.findByEmail("auth-fixture@example.test")).thenReturn(user("USER"));
+            for (var request : java.util.List.of(get("/api/admin/promotions"),
+                    post("/api/admin/promotions").contentType("application/json").content("{\"code\":\"424\",\"percentage\":15,\"active\":true,\"productIds\":[1]}"),
+                    put("/api/admin/promotions/1").contentType("application/json").content("{\"code\":\"424\",\"percentage\":20,\"active\":false,\"productIds\":[1]}"))) {
+                if (authenticated) request.header("Authorization", bearer("USER"));
+                mvc.perform(request).andExpect(authenticated ? status().isForbidden() : status().isUnauthorized());
+            }
+        }
+        verifyNoInteractions(promotions);
+    }
+
+    @Test void adminCanCreateAndEditProductSpecificPromotions() throws Exception {
+        when(users.findByEmail("auth-fixture@example.test")).thenReturn(user("ADMIN"));
+        var saved = new com.cosmetic.ecommerce.entity.Promotion(); saved.setId(1L); saved.setCode("424");
+        saved.setPercentage(new java.math.BigDecimal("15")); saved.setProductIds(java.util.Set.of(1L));
+        when(promotions.save(any(), any())).thenReturn(saved);
+        String body = "{\"code\":\"424\",\"percentage\":15,\"active\":true,\"productIds\":[1]}";
+        mvc.perform(post("/api/admin/promotions").header("Authorization", bearer("ADMIN")).contentType("application/json").content(body))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.code").value("424")).andExpect(jsonPath("$.productIds[0]").value(1));
+        mvc.perform(put("/api/admin/promotions/1").header("Authorization", bearer("ADMIN")).contentType("application/json").content(body))
+                .andExpect(status().isOk());
+        verify(promotions).save(isNull(), any()); verify(promotions).save(eq(1L), any());
+    }
+
+    @Test void adminCannotSubmitInvalidRatesOrEmptyProductSelections() throws Exception {
+        when(users.findByEmail("auth-fixture@example.test")).thenReturn(user("ADMIN"));
+        for (String body : new String[]{"{\"code\":\"424\",\"percentage\":101,\"active\":true,\"productIds\":[1]}",
+                "{\"code\":\"424\",\"percentage\":15,\"active\":true,\"productIds\":[]}"}) {
+            mvc.perform(post("/api/admin/promotions").header("Authorization", bearer("ADMIN")).contentType("application/json").content(body))
+                    .andExpect(status().isBadRequest());
+        }
+        verifyNoInteractions(promotions);
+    }
+
+    @Test void quoteRequiresLoginAndAcceptsOnlyValidProductSelections() throws Exception {
+        String body = "{\"couponCode\":\"424\",\"items\":[{\"productId\":1,\"quantity\":2}]}";
+        mvc.perform(post("/api/checkout/quote").contentType("application/json").content(body)).andExpect(status().isUnauthorized());
+        when(users.findByEmail("auth-fixture@example.test")).thenReturn(user("USER"));
+        for (String invalid : new String[]{"{\"items\":[]}", "{\"items\":[null]}", "{\"items\":[{\"productId\":1,\"quantity\":0}]}"}) {
+            mvc.perform(post("/api/checkout/quote").header("Authorization", bearer("USER")).contentType("application/json").content(invalid))
+                    .andExpect(status().isBadRequest());
+        }
+        verifyNoInteractions(quotes);
+        when(quotes.quote(any(), eq("424"))).thenReturn(new OrderPricing.Totals(new java.math.BigDecimal("2000.00"), java.math.BigDecimal.ZERO,
+                new java.math.BigDecimal("300.00"), new java.math.BigDecimal("400.00"), new java.math.BigDecimal("2100.00"), "424", new java.math.BigDecimal("15.00")));
+        mvc.perform(post("/api/checkout/quote").header("Authorization", bearer("USER")).contentType("application/json").content(body))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.couponDiscount").value(300)).andExpect(jsonPath("$.total").value(2100));
+    }
 
     private String directCheckoutBody() {
         return """

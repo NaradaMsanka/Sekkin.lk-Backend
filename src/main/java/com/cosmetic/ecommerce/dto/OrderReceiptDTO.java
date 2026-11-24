@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 public record OrderReceiptDTO(Long id, Long orderId, String shippingAddress, String customerPhone, Double totalAmount,
         Double deliveryCharge, Double discountAmount, String couponCode, String paymentMethod,
         String paymentStatus, String status, LocalDateTime orderDate, Double subtotal,
-        Double couponDiscount, String message) {
+        Double couponDiscount, java.math.BigDecimal couponPercentage, String message) {
     public static OrderReceiptDTO from(Order order) {
         BigDecimal subtotal = order.getOrderItems().stream()
                 .map(item -> BigDecimal.valueOf(item.getPrice()).multiply(BigDecimal.valueOf(item.getQuantity())))
@@ -17,7 +17,8 @@ public record OrderReceiptDTO(Long id, Long orderId, String shippingAddress, Str
                 .subtract(BigDecimal.valueOf(order.getTotalAmount())).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
         return new OrderReceiptDTO(order.getId(), order.getId(), order.getShippingAddress(), order.getCustomerPhone(), order.getTotalAmount(),
                 order.getDeliveryCharge(), order.getDiscountAmount(), order.getCouponCode(), order.getPaymentMethod(),
-                order.getPaymentStatus(), order.getStatus(), order.getOrderDate(), subtotal.doubleValue(), coupon.doubleValue(),
+                order.getPaymentStatus(), order.getStatus(), order.getOrderDate(), subtotal.doubleValue(),
+                order.getCouponDiscount() == null ? coupon.doubleValue() : order.getCouponDiscount(), order.getCouponPercentage(),
                 "Order request received. Acceptance requires business confirmation. This receipt is not proof of payment.");
     }
 }

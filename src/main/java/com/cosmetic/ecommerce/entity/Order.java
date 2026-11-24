@@ -48,7 +48,7 @@ public class Order {
 
     // ඇණවුම දැමූ පුද්ගලයා
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = true) // Allows guest direct checkout as well as logged in user
+    @JoinColumn(name = "user_id", nullable = true) // Preserve historical guest orders; new checkout requires an account.
     @JsonIgnore
     private User user;
 
@@ -72,6 +72,8 @@ public class Order {
     // --- Day 26: Simple Coupon & Discount Fields ---
     // පාරිභෝගිකයා භාවිතා කළ Coupon කේතය (උදා: GLOW10, SAVE500)
     private String couponCode;
+    @Column(precision = 5, scale = 2) private java.math.BigDecimal couponPercentage;
+    private Double couponDiscount;
 
     // Coupon හෝ වට්ටම් මඟින් අඩු වූ මුදල
     private Double discountAmount = 0.0;
@@ -122,6 +124,10 @@ public class Order {
 
     public String getCouponCode() { return couponCode; }
     public void setCouponCode(String couponCode) { this.couponCode = couponCode; }
+    public java.math.BigDecimal getCouponPercentage() { return couponPercentage; }
+    public void setCouponPercentage(java.math.BigDecimal value) { couponPercentage = value; }
+    public Double getCouponDiscount() { return couponDiscount; }
+    public void setCouponDiscount(Double value) { couponDiscount = value; }
 
     public Double getDiscountAmount() { return discountAmount; }
     public void setDiscountAmount(Double discountAmount) { this.discountAmount = discountAmount; }

@@ -30,6 +30,7 @@ class OrderShippingPersistenceTest {
     @Autowired ProductRepository products;
     @Autowired UserRepository users;
     @Autowired EntityManager entityManager;
+    @Autowired PromotionRepository promotionRepository;
 
     @Test void savesNewFeesWithoutChangingHistoricalRows() {
         Order historical = new Order(); historical.setDeliveryCharge(0.0); historical.setTotalAmount(1000.0);
@@ -38,9 +39,11 @@ class OrderShippingPersistenceTest {
         product.setPrice(new BigDecimal("2500.00")); product.setStockQuantity(10);
         product = products.saveAndFlush(product);
         CartService carts = mock(CartService.class);
-        OrderService service = new OrderService(orders, carts, products, users);
+        PromotionService promotions = new PromotionService(promotionRepository, products);
+        promotions.save(null, new com.cosmetic.ecommerce.dto.PromotionRequest("424", new BigDecimal("10"), true, java.util.Set.of(product.getId())));
+        OrderService service = new OrderService(orders, carts, products, users, promotions);
         DirectOrderRequestDTO request = new DirectOrderRequestDTO(); request.setProductId(product.getId());
-        request.setQuantity(2); request.setPaymentMethod("COD"); request.setCouponCode("SAVE500");
+        request.setQuantity(2); request.setPaymentMethod("COD"); request.setCouponCode("424");
         request.setEmail("fixture@example.test"); request.setAddress("Test address");
         User user = new User(); user.setName("Fixture"); user.setEmail("cart@example.test");
         user.setPassword("synthetic-test-only"); user.setRole("USER"); user = users.saveAndFlush(user);
@@ -48,7 +51,7 @@ class OrderShippingPersistenceTest {
         Cart cart = new Cart(); cart.setUser(user); CartItem item = new CartItem();
         item.setProduct(product); item.setQuantity(2); cart.getItems().add(item);
         when(carts.getCart("cart@example.test")).thenReturn(cart);
-        Order normal = service.createOrder("cart@example.test", "Test address", "SAVE500");
+        Order normal = service.createOrder("cart@example.test", "Test address", "424");
         orders.flush(); entityManager.clear();
         for (long id : new long[]{direct.getId(), normal.getId()}) {
             Order persisted = orders.findById(id).orElseThrow();

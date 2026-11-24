@@ -66,6 +66,8 @@ class PostgresReleaseIntegrationTest {
             statement.execute(migration); statement.execute(migration);
             String passwordResetMigration = Files.readString(Path.of("docs/migrations/2026-11-22-password-reset.sql"));
             statement.execute(passwordResetMigration); statement.execute(passwordResetMigration);
+            String promotionsMigration = Files.readString(Path.of("docs/migrations/2026-11-24-product-promotions.sql"));
+            statement.execute(promotionsMigration); statement.execute(promotionsMigration);
         }
         properties.add("spring.datasource.url", () -> URL);
         properties.add("spring.datasource.username", () -> "sekkin_test");
@@ -95,6 +97,7 @@ class PostgresReleaseIntegrationTest {
     @Autowired OrderService service; @Autowired OrderPlacementService placement; @Autowired CartService carts;
     @Autowired AccountSecurityService accounts; @Autowired PlatformTransactionManager manager;
     @Autowired PasswordResetService passwordResets;
+    @Autowired PromotionService promotions;
     @Autowired JwtUtil jwt; @Autowired PasswordEncoder passwords; @Autowired MockMvc mvc; @Autowired JdbcTemplate jdbc;
     private User checkoutUser;
     @org.junit.jupiter.api.BeforeEach void signInCheckoutCustomer() { checkoutUser = user("USER"); }
@@ -200,9 +203,10 @@ class PostgresReleaseIntegrationTest {
     }
 
     @Test void merchandiseCouponNeverReducesShippingAndHistoryStaysUnchanged() {
-        Product product = product(10); DirectOrderRequestDTO request = request(product); request.setQuantity(3); request.setCouponCode("SAVE500"); request.setExpectedTotal(new BigDecimal("2900"));
+        Product product = product(10); DirectOrderRequestDTO request = request(product); request.setQuantity(3); request.setCouponCode("424"); request.setExpectedTotal(new BigDecimal("3100"));
+        promotions.save(null, new com.cosmetic.ecommerce.dto.PromotionRequest("424", new BigDecimal("10"), true, Set.of(product.getId())));
         Order order = placement.placeDirect(UUID.randomUUID().toString(), request, checkoutUser.getEmail());
-        assertEquals(2900.0, order.getTotalAmount()); assertEquals(400.0, order.getDeliveryCharge()); assertEquals(500.0, order.getDiscountAmount());
+        assertEquals(3100.0, order.getTotalAmount()); assertEquals(400.0, order.getDeliveryCharge()); assertEquals(300.0, order.getDiscountAmount());
         Order history = orders.findById(900001L).orElseThrow(); assertEquals(1000.0, history.getTotalAmount()); assertEquals(0.0, history.getDeliveryCharge());
     }
 

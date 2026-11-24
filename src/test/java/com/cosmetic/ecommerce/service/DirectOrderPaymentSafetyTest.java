@@ -34,6 +34,7 @@ class DirectOrderPaymentSafetyTest {
     @Mock ProductRepository products;
     @Mock UserRepository users;
     @Mock CartService carts;
+    @Mock PromotionService promotions;
     @InjectMocks OrderService service;
 
     private DirectOrderRequestDTO request(String method) {
@@ -57,7 +58,8 @@ class DirectOrderPaymentSafetyTest {
         product.setStockQuantity(5); product.setPrice(new BigDecimal("2500")); product.setDiscountPrice(new BigDecimal("2000"));
         when(products.findByIdForUpdate(2L)).thenReturn(Optional.of(product));
         when(orders.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        DirectOrderRequestDTO request = request(" cod "); request.setCouponCode("GLOW10");
+        DirectOrderRequestDTO request = request(" cod "); request.setCouponCode("424");
+        when(promotions.resolve("424")).thenReturn(new OrderPricing.PromotionRule("424", new BigDecimal("10"), java.util.Set.of(2L)));
         User account = new User(); account.setEmail("buyer@example.test");
         when(users.findByEmailForUpdate(account.getEmail())).thenReturn(account);
         Order order = service.createDirectOrder(request, account.getEmail());
@@ -76,7 +78,7 @@ class DirectOrderPaymentSafetyTest {
             mvc.perform(post("/api/orders/direct").contentType("application/json").content("{" + base + ",\"paymentMethod\":\"" + method + "\"}"))
                     .andExpect(status().isBadRequest());
         }
-        for (String field : new String[]{"cardNumber", "cardExpiry", "cardCvc", "paymentStatus", "deliveryCharge", "totalAmount", "price"}) {
+        for (String field : new String[]{"cardNumber", "cardExpiry", "cardCvc", "paymentStatus", "deliveryCharge", "totalAmount", "price", "couponDiscount", "couponPercentage"}) {
             mvc.perform(post("/api/orders/direct").contentType("application/json").content("{" + base + ",\"paymentMethod\":\"COD\",\"" + field + "\":\"test-only-value\"}"))
                     .andExpect(status().isBadRequest());
         }

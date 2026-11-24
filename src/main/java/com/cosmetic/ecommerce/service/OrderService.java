@@ -20,9 +20,11 @@ public class OrderService {
     private final CartService cartService;
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
+    private final PromotionService promotions;
 
-    public OrderService(OrderRepository orders, CartService carts, ProductRepository products, UserRepository users) {
+    public OrderService(OrderRepository orders, CartService carts, ProductRepository products, UserRepository users, PromotionService promotions) {
         orderRepository = orders; cartService = carts; productRepository = products; userRepository = users;
+        this.promotions = promotions;
     }
 
     @Transactional
@@ -132,7 +134,7 @@ public class OrderService {
 
     private OrderPricing.Totals priceAndValidateStock(List<OrderPricing.Line> lines, String coupon) {
         OrderPricing.Totals totals;
-        try { totals = OrderPricing.calculate(lines, coupon); }
+        try { totals = OrderPricing.calculate(lines, PromotionService.normalize(coupon) == null ? null : promotions.resolve(coupon)); }
         catch (IllegalArgumentException error) { throw bad(error.getMessage()); }
         // Preserve the existing monetary schema without silently losing cents on unsupported large values.
         for (BigDecimal amount : List.of(totals.subtotal(), totals.savings(), totals.couponDiscount(), totals.deliveryCharge(), totals.total())) storedMoney(amount);
@@ -158,6 +160,7 @@ public class OrderService {
     private void applyTotals(Order order, OrderPricing.Totals totals) {
         order.setDeliveryCharge(storedMoney(totals.deliveryCharge())); order.setCouponCode(totals.couponCode());
         order.setDiscountAmount(storedMoney(totals.savings())); order.setTotalAmount(storedMoney(totals.total()));
+        order.setCouponPercentage(totals.couponPercentage()); order.setCouponDiscount(storedMoney(totals.couponDiscount()));
     }
 
     private double storedMoney(BigDecimal amount) {
