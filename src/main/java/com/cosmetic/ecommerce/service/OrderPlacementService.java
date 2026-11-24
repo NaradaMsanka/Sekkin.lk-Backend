@@ -58,10 +58,15 @@ public class OrderPlacementService {
         // A key denotes a single cart checkout attempt. The browser changes it when cart contents change.
         if (request.getCustomerPhone() == null || request.getCustomerPhone().isBlank() || request.getCustomerPhone().length() > 40)
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Customer phone is required");
-        String fingerprint = hash(canonical(request.getShippingAddress(), request.getCustomerPhone(), normalize(request.getCouponCode()), intendedItems,
-                request.getExpectedTotal().stripTrailingZeros().toPlainString()));
+        String intent = canonical(request.getShippingAddress(), request.getCustomerPhone(), normalize(request.getCouponCode()), intendedItems,
+                request.getExpectedTotal().stripTrailingZeros().toPlainString());
+        // Preserve replay of older requests that did not include editable contact details.
+        if (request.getCustomerName() != null || request.getCustomerEmail() != null || request.getPostalCode() != null)
+            intent += canonical(request.getCustomerName(), request.getCustomerEmail(), request.getPostalCode());
+        String fingerprint = hash(intent);
         return place(scope, fingerprint, () -> service.createOrder(email, request.getShippingAddress(), request.getCouponCode(),
-                request.getExpectedTotal(), scope, fingerprint, request.getCartItems(), request.getCustomerPhone()));
+                request.getExpectedTotal(), scope, fingerprint, request.getCartItems(), request.getCustomerPhone(),
+                request.getCustomerName(), request.getCustomerEmail(), request.getPostalCode()));
     }
 
     private Order place(String keyHash, String fingerprint, Supplier<Order> create) {

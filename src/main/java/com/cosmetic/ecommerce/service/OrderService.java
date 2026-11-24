@@ -49,6 +49,13 @@ public class OrderService {
     @Transactional
     public Order createOrder(String email, String address, String coupon, BigDecimal expectedTotal, String keyHash, String fingerprint,
             List<com.cosmetic.ecommerce.dto.CartOrderRequestDTO.CartLine> expectedItems, String customerPhone) {
+        return createOrder(email, address, coupon, expectedTotal, keyHash, fingerprint, expectedItems, customerPhone, null, null, null);
+    }
+
+    @Transactional
+    public Order createOrder(String email, String address, String coupon, BigDecimal expectedTotal, String keyHash, String fingerprint,
+            List<com.cosmetic.ecommerce.dto.CartOrderRequestDTO.CartLine> expectedItems, String customerPhone,
+            String customerName, String customerEmail, String postalCode) {
         if (address == null || address.isBlank()) throw bad("Shipping address is required");
         // Every cart mutation locks its owning user first. Checkout shares that lock until commit.
         Cart cart = cartService.getCart(email);
@@ -72,7 +79,9 @@ public class OrderService {
         verifyExpectedTotal(expectedTotal, totals.total());
         Order order = newOrder(keyHash, fingerprint);
         order.setUser(cart.getUser()); order.setShippingAddress(address);
-        order.setCustomerName(cart.getUser().getName()); order.setCustomerEmail(cart.getUser().getEmail()); order.setCustomerPhone(customerPhone);
+        order.setCustomerName(customerName == null || customerName.isBlank() ? cart.getUser().getName() : customerName.trim());
+        order.setCustomerEmail(customerEmail == null || customerEmail.isBlank() ? cart.getUser().getEmail() : customerEmail.trim());
+        order.setCustomerPhone(customerPhone); order.setPostalCode(postalCode == null || postalCode.isBlank() ? null : postalCode.trim());
         applyTotals(order, totals); reserveItems(order, lines);
         Order saved = orderRepository.saveAndFlush(order);
         cartService.clearCart(email);
