@@ -37,6 +37,7 @@ public class OrderController {
                 .customerEmail(order.getCustomerEmail()).shippingAddress(order.getShippingAddress()).postalCode(order.getPostalCode())
                 .paymentMethod(order.getPaymentMethod()).paymentStatus(order.getPaymentStatus()).deliveryCharge(order.getDeliveryCharge())
                 .subtotal(subtotal.doubleValue()).totalAmount(order.getTotalAmount()).discountAmount(order.getDiscountAmount())
+                .couponCode(order.getCouponCode()).couponPercentage(order.getCouponPercentage())
                 .couponDiscount(subtotal.add(BigDecimal.valueOf(order.getDeliveryCharge())).subtract(BigDecimal.valueOf(order.getTotalAmount()))
                         .max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP).doubleValue())
                 .status(order.getStatus()).orderDate(order.getOrderDate())
@@ -54,7 +55,8 @@ public class OrderController {
     public ResponseEntity<List<OrderResponseDTO>> getUserOrders() {
         return ResponseEntity.ok(orderService.getUserOrders(loggedInEmail()).stream().map(order -> {
             OrderResponseDTO dto = new OrderResponseDTO(order.getId(), order.getShippingAddress(), order.getTotalAmount(), order.getStatus(), order.getOrderDate());
-            dto.setDeliveryCharge(order.getDeliveryCharge()); return dto;
+            dto.setDeliveryCharge(order.getDeliveryCharge()); dto.setCouponCode(order.getCouponCode());
+            dto.setCouponPercentage(order.getCouponPercentage()); dto.setCouponDiscount(order.getCouponDiscount()); return dto;
         }).toList());
     }
 
@@ -74,6 +76,7 @@ public class OrderController {
     private OrderResponseDTO summary(Order order) {
         OrderResponseDTO dto = new OrderResponseDTO(order.getId(), order.getShippingAddress(), order.getTotalAmount(), order.getStatus(), order.getOrderDate());
         dto.setDeliveryCharge(order.getDeliveryCharge());
+        dto.setCouponCode(order.getCouponCode()); dto.setCouponPercentage(order.getCouponPercentage()); dto.setCouponDiscount(order.getCouponDiscount());
         return dto;
     }
 }

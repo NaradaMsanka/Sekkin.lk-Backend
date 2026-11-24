@@ -30,12 +30,13 @@ class OrderConcurrencyPersistenceTest {
     @Configuration
     @EnableJpaRepositories(basePackageClasses = OrderRepository.class)
     @EntityScan(basePackageClasses = Order.class)
-    @Import({OrderService.class, CartService.class, OrderPlacementService.class})
+    @Import({OrderService.class, CartService.class, OrderPlacementService.class, PromotionService.class})
     static class PersistenceConfiguration {}
 
     @Autowired ProductRepository products; @Autowired OrderRepository orders; @Autowired UserRepository users;
     @Autowired CartRepository carts; @Autowired OrderService service; @Autowired OrderPlacementService placement;
     @Autowired PlatformTransactionManager manager;
+    @Autowired PromotionService promotions;
     private User checkoutUser;
     @org.junit.jupiter.api.BeforeEach void signInCheckoutCustomer() { checkoutUser = account(); }
 
@@ -60,6 +61,28 @@ class OrderConcurrencyPersistenceTest {
             assertTrue(ready.await(5, TimeUnit.SECONDS)); start.countDown();
             return List.of(results.get(0).get(15, TimeUnit.SECONDS), results.get(1).get(15, TimeUnit.SECONDS));
         } finally { pool.shutdownNow(); assertTrue(pool.awaitTermination(5, TimeUnit.SECONDS)); }
+    }
+
+    @Test void retryReturnsOriginalPromotionEvenAfterTheCodeIsDisabled() {
+        Product product = product(3);
+        var promotion = promotions.save(null, new PromotionRequest("424", new BigDecimal("10"), true, Set.of(product.getId())));
+        DirectOrderRequestDTO request = request(product); request.setCouponCode("424"); request.setExpectedTotal(new BigDecimal("1300"));
+        String key = UUID.randomUUID().toString(); Order original = placement.placeDirect(key, request, checkoutUser.getEmail());
+        promotions.save(promotion.getId(), new PromotionRequest("424", new BigDecimal("50"), false, Set.of(product.getId())));
+        Order replay = placement.placeDirect(key, request, checkoutUser.getEmail());
+        assertEquals(original.getId(), replay.getId()); assertEquals(1300.0, replay.getTotalAmount()); assertEquals(100.0, replay.getCouponDiscount());
+        assertEquals(new BigDecimal("10.00"), replay.getCouponPercentage()); assertEquals(2, products.findById(product.getId()).orElseThrow().getStockQuantity());
+    }
+
+    @Test void changedOfferRequiresFreshConsentBeforeCreatingAnOrder() {
+        Product product = product(3);
+        var promotion = promotions.save(null, new PromotionRequest("CHANGED", new BigDecimal("10"), true, Set.of(product.getId())));
+        DirectOrderRequestDTO request = request(product); request.setCouponCode("CHANGED"); request.setExpectedTotal(new BigDecimal("1300"));
+        promotions.save(promotion.getId(), new PromotionRequest("CHANGED", new BigDecimal("20"), true, Set.of(product.getId())));
+        long before = orders.count();
+        assertEquals(409, assertThrows(ResponseStatusException.class,
+                () -> placement.placeDirect(UUID.randomUUID().toString(), request, checkoutUser.getEmail())).getStatusCode().value());
+        assertEquals(before, orders.count()); assertEquals(3, products.findById(product.getId()).orElseThrow().getStockQuantity());
     }
 
     @Test void twoIndependentCheckoutsCannotOversellTheLastUnit() throws Exception {

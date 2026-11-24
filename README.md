@@ -21,7 +21,7 @@ See [the demo and submission guide](docs/DEMO_SUBMISSION.md) for the walkthrough
 - Registration/login, BCrypt passwords, JWT authentication, `ADMIN`/`USER` authorization, account disabling and session revocation.
 - Product/category operations, stock and discounts, product images and review eligibility.
 - Customer cart operations and server-calculated pricing.
-- Cart and direct COD checkout, a single LKR 350 delivery fee, coupon validation and UUIDv4 retry protection.
+- Authenticated cart and direct COD checkout, a single LKR 400 delivery fee, product-specific promo codes and UUIDv4 retry protection.
 - Customer order history; administrator acceptance, fulfilment transitions, cancellation and separate COD collection recording.
 - Validation, request throttling and isolated service/security/persistence tests.
 
@@ -32,6 +32,8 @@ Use [.env.example](.env.example) as a variable checklist. Spring Boot does **not
 Run `./mvnw spring-boot:run` (Windows: `.\mvnw.cmd spring-boot:run`) after configuring the database. For an explicitly disposable local database, `JPA_DDL_AUTO=update` can create the initial schema. Existing databases default to validation.
 
 Review [the additive order/session migration](docs/migrations/2026-11-16-order-session-safety.sql) against the intended database before deploying the updated entities. It is not executed at startup. Do not use `create` or `create-drop` with production data.
+
+For promo codes, run [the product promotions migration](docs/migrations/2026-11-24-product-promotions.sql) before deploying this backend. It adds promo-code storage and order discount snapshots without changing historical order amounts. No codes are seeded automatically. In the admin dashboard, open **Promo codes**, create a code, enter its percentage, select eligible products, and save it as active. Codes ignore surrounding whitespace and letter case. Discounts apply to the selected products at their current selling prices; delivery remains LKR 400. Editing or disabling a code does not alter existing orders.
 
 The existing Docker Compose setup is local development configuration with local database credentials. Set `JWT_SECRET` before `docker compose up --build`; checkout remains disabled unless explicitly enabled. The submission demo uses the separate script above.
 
@@ -58,6 +60,8 @@ The normal test suite uses isolated fixtures. Real PostgreSQL tests additionally
 | `GET /api/cart`, `POST /api/cart/items` | Authenticated customer cart |
 | `POST /api/orders` | Authenticated cart checkout |
 | `POST /api/orders/direct` | Direct COD order request |
+| `POST /api/checkout/quote` | Authenticated product-based promo validation and price preview |
+| `GET/POST /api/admin/promotions`, `PUT /api/admin/promotions/{id}` | Administrator promo-code management |
 | `GET /api/orders` | Current customer's orders |
 | `GET /api/admin/dashboard`, `GET /api/admin/orders` | Administrator reporting |
 | `POST /api/admin/orders/{id}/accept` | Administrator order acceptance |

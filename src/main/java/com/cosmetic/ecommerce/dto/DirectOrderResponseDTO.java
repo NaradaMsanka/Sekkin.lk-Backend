@@ -24,6 +24,8 @@ public class DirectOrderResponseDTO {
     private Double totalAmount;
     private Double discountAmount;
     private Double couponDiscount;
+    private String couponCode;
+    private java.math.BigDecimal couponPercentage;
     private String status;
     private LocalDateTime orderDate;
     private String productName;
