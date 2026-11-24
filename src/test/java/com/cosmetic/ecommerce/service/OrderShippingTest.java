@@ -50,14 +50,14 @@ class OrderShippingTest {
     }
     private void saveOrders() { when(orders.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0)); }
 
-    @ParameterizedTest @CsvSource({"1000,1350", "5000,5350", "10000,10350"})
-    void eachCheckoutCharges350OnceUsingCatalogPrices(String price, double expected) {
+    @ParameterizedTest @CsvSource({"1000,1400", "5000,5400", "10000,10400"})
+    void eachCheckoutCharges400OnceUsingCatalogPrices(String price, double expected) {
         Product product = product(1, price); when(products.findByIdForUpdate(1L)).thenReturn(Optional.of(product));
         when(carts.getCart(email)).thenReturn(cart(product, 1)); saveOrders();
         Order normal = service.createOrder(email, "Test address");
         Order direct = service.createDirectOrder(direct(product, 1, null), null);
         for (Order order : List.of(normal, direct)) {
-            assertEquals(350.0, order.getDeliveryCharge()); assertEquals(expected, order.getTotalAmount());
+            assertEquals(400.0, order.getDeliveryCharge()); assertEquals(expected, order.getTotalAmount());
             assertEquals("PENDING_COD", order.getPaymentStatus());
         }
     }
@@ -68,25 +68,25 @@ class OrderShippingTest {
         when(products.findByIdForUpdate(1L)).thenReturn(Optional.of(first)); when(products.findByIdForUpdate(2L)).thenReturn(Optional.of(second));
         when(carts.getCart(email)).thenReturn(cart); saveOrders();
         Order order = service.createOrder(email, "Test address");
-        assertEquals(5350.0, order.getTotalAmount()); assertEquals(350.0, order.getDeliveryCharge());
+        assertEquals(5400.0, order.getTotalAmount()); assertEquals(400.0, order.getDeliveryCharge());
         assertEquals(2, order.getOrderItems().size());
     }
 
-    @ParameterizedTest @CsvSource({"SAVE500,4850", "GLOW10,4850", "WELCOME10,4850", "unknown,5350"})
+    @ParameterizedTest @CsvSource({"SAVE500,4900", "GLOW10,4900", "WELCOME10,4900", "unknown,5400"})
     void couponsOnlyDiscountMerchandiseForBothFlows(String coupon, double expected) {
         Product product = product(1, "2500"); when(products.findByIdForUpdate(1L)).thenReturn(Optional.of(product));
         when(carts.getCart(email)).thenReturn(cart(product, 2)); saveOrders();
         Order normal = service.createOrder(email, "Test address", coupon);
         Order direct = service.createDirectOrder(direct(product, 2, coupon), null);
         assertEquals(expected, normal.getTotalAmount()); assertEquals(expected, direct.getTotalAmount());
-        assertEquals(350.0, normal.getDeliveryCharge()); assertEquals(350.0, direct.getDeliveryCharge());
+        assertEquals(400.0, normal.getDeliveryCharge()); assertEquals(400.0, direct.getDeliveryCharge());
     }
 
     @Test void productAndCouponSavingsAreNotSubtractedTwice() {
         Product product = product(1, "3000"); product.setDiscountPrice(new BigDecimal("2500"));
         when(products.findByIdForUpdate(1L)).thenReturn(Optional.of(product)); saveOrders();
         Order order = service.createDirectOrder(direct(product, 2, "SAVE500"), null);
-        assertEquals(4850.0, order.getTotalAmount()); assertEquals(1500.0, order.getDiscountAmount());
+        assertEquals(4900.0, order.getTotalAmount()); assertEquals(1500.0, order.getDiscountAmount());
         assertEquals(2500.0, order.getOrderItems().getFirst().getPrice());
     }
 
@@ -94,7 +94,7 @@ class OrderShippingTest {
         Product product = product(1, "0.05");
         var totals = OrderPricing.calculate(List.of(new OrderPricing.Line(product, 1)), "GLOW10");
         assertEquals(new BigDecimal("0.01"), totals.couponDiscount());
-        assertEquals(new BigDecimal("350.04"), totals.total());
+        assertEquals(new BigDecimal("400.04"), totals.total());
     }
 
     @Test void emptyCartIsRejectedWithoutWrites() {
@@ -152,19 +152,19 @@ class OrderShippingTest {
         Product product = product(1, "2500"); when(products.findByIdForUpdate(1L)).thenReturn(Optional.of(product)); saveOrders();
         when(placement.placeDirect(any(), any(), any())).thenAnswer(call -> service.createDirectOrder(call.getArgument(1), call.getArgument(2)));
         var mvc = MockMvcBuilders.standaloneSetup(new OrderController(service, placement)).build();
-        mvc.perform(post("/api/orders/direct").header("Idempotency-Key", UUID.randomUUID().toString()).contentType("application/json").content("{\"productId\":1,\"quantity\":2,\"name\":\"Fixture\",\"phoneNumber\":\"0000000000\",\"email\":\"fixture@example.test\",\"address\":\"Test\",\"paymentMethod\":\"COD\",\"couponCode\":\"SAVE500\",\"expectedTotal\":4850}"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.deliveryCharge").value(350.0))
+        mvc.perform(post("/api/orders/direct").header("Idempotency-Key", UUID.randomUUID().toString()).contentType("application/json").content("{\"productId\":1,\"quantity\":2,\"name\":\"Fixture\",\"phoneNumber\":\"0000000000\",\"email\":\"fixture@example.test\",\"address\":\"Test\",\"paymentMethod\":\"COD\",\"couponCode\":\"SAVE500\",\"expectedTotal\":4900}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.deliveryCharge").value(400.0))
                 .andExpect(jsonPath("$.subtotal").value(5000.0)).andExpect(jsonPath("$.couponDiscount").value(500.0))
-                .andExpect(jsonPath("$.totalAmount").value(4850.0)).andExpect(jsonPath("$.paymentStatus").value("PENDING_COD"));
+                .andExpect(jsonPath("$.totalAmount").value(4900.0)).andExpect(jsonPath("$.paymentStatus").value("PENDING_COD"));
         var saved = ArgumentCaptor.forClass(Order.class); verify(orders).saveAndFlush(saved.capture());
-        assertEquals(350.0, saved.getValue().getDeliveryCharge()); assertEquals(4850.0, saved.getValue().getTotalAmount());
+        assertEquals(400.0, saved.getValue().getDeliveryCharge()); assertEquals(4900.0, saved.getValue().getTotalAmount());
     }
 
-    @ParameterizedTest @CsvSource({"2499,0,2849", "2500,500,2350", "2501,500,2351"})
+    @ParameterizedTest @CsvSource({"2499,0,2899", "2500,500,2400", "2501,500,2401"})
     void flatCouponThresholdNeverChangesDelivery(String subtotal, String discount, String total) {
         var amounts = OrderPricing.calculate(List.of(new OrderPricing.Line(product(1, subtotal), 1)), "SAVE500");
         assertEquals(new BigDecimal(discount).setScale(2), amounts.couponDiscount());
         assertEquals(new BigDecimal(total).setScale(2), amounts.total());
-        assertEquals(new BigDecimal("350.00"), amounts.deliveryCharge());
+        assertEquals(new BigDecimal("400.00"), amounts.deliveryCharge());
     }
 }

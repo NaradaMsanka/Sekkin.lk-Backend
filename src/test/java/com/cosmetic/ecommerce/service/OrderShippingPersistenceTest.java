@@ -52,7 +52,7 @@ class OrderShippingPersistenceTest {
         orders.flush(); entityManager.clear();
         for (long id : new long[]{direct.getId(), normal.getId()}) {
             Order persisted = orders.findById(id).orElseThrow();
-            assertEquals(350.0, persisted.getDeliveryCharge()); assertEquals(4850.0, persisted.getTotalAmount());
+            assertEquals(400.0, persisted.getDeliveryCharge()); assertEquals(4900.0, persisted.getTotalAmount());
             assertEquals(500.0, persisted.getDiscountAmount()); assertEquals(2500.0, persisted.getOrderItems().getFirst().getPrice());
         }
         Order unchanged = orders.findById(historicalId).orElseThrow();

@@ -110,7 +110,7 @@ class PostgresReleaseIntegrationTest {
     private DirectOrderRequestDTO request(Product product) {
         DirectOrderRequestDTO request = new DirectOrderRequestDTO(); request.setProductId(product.getId()); request.setQuantity(1);
         request.setName("Synthetic buyer"); request.setEmail("guest@example.test"); request.setPhoneNumber("test-only-phone");
-        request.setAddress("Synthetic test address"); request.setPaymentMethod("COD"); request.setExpectedTotal(new BigDecimal("1350.00")); return request;
+        request.setAddress("Synthetic test address"); request.setPaymentMethod("COD"); request.setExpectedTotal(new BigDecimal("1400.00")); return request;
     }
     private String bearer(User user) { return "Bearer " + jwt.generateToken(user.getEmail(), user.getRole(), user.getSessionVersion()); }
     private String resetToken(User user) {
@@ -157,7 +157,7 @@ class PostgresReleaseIntegrationTest {
         assertTrue(results.stream().allMatch(Order.class::isInstance)); assertEquals(((Order) results.get(0)).getId(), ((Order) results.get(1)).getId());
         assertEquals(before + 1, orders.count()); assertEquals(stock - 1, products.findById(product.getId()).orElseThrow().getStockQuantity());
         transaction(() -> { Product changed = products.findByIdForUpdate(product.getId()).orElseThrow(); changed.setPrice(new BigDecimal("2000")); return products.save(changed); });
-        assertEquals(1350.0, placement.placeDirect(key, request(product), null).getTotalAmount());
+        assertEquals(1400.0, placement.placeDirect(key, request(product), null).getTotalAmount());
         DirectOrderRequestDTO changed = request(product); changed.setAddress("Different synthetic address");
         assertEquals(409, assertThrows(ResponseStatusException.class, () -> placement.placeDirect(key, changed, null)).getStatusCode().value());
     }
@@ -165,7 +165,7 @@ class PostgresReleaseIntegrationTest {
     @Test void cartRetriesAndGuestOwnershipAreSafeOnPostgresql() throws Exception {
         User user = user("USER"); Product product = product(4); carts.addProductToCart(user.getEmail(), product.getId(), 1);
         CartOrderRequestDTO request = new CartOrderRequestDTO(); request.setShippingAddress("Synthetic cart address");
-        request.setCustomerPhone("test-only-phone"); request.setExpectedTotal(new BigDecimal("1350.00"));
+        request.setCustomerPhone("test-only-phone"); request.setExpectedTotal(new BigDecimal("1400.00"));
         request.setCartItems(List.of(new CartOrderRequestDTO.CartLine(product.getId(), 1))); String key = UUID.randomUUID().toString();
         List<Object> results = race(() -> placement.placeCart(key, request, user.getEmail()), () -> placement.placeCart(key, request, user.getEmail()));
         assertTrue(results.stream().allMatch(Order.class::isInstance)); assertEquals(((Order) results.get(0)).getId(), ((Order) results.get(1)).getId());
@@ -184,22 +184,22 @@ class PostgresReleaseIntegrationTest {
 
     @Test void codEvidenceIsRequiredAndConcurrentCollectionKeepsOneAudit() throws Exception {
         Product product = product(2); Order order = placement.placeDirect(UUID.randomUUID().toString(), request(product), null);
-        assertThrows(ResponseStatusException.class, () -> service.recordCodCollection(order.getId(), new BigDecimal("1350"), "synthetic-settlement", "operator@example.test"));
+        assertThrows(ResponseStatusException.class, () -> service.recordCodCollection(order.getId(), new BigDecimal("1400"), "synthetic-settlement", "operator@example.test"));
         service.acceptOrder(order.getId(), "synthetic-confirmation", "operator@example.test");
         service.updateOrderStatus(order.getId(), "SHIPPED"); service.updateOrderStatus(order.getId(), "DELIVERED");
         assertEquals("PENDING_COD", orders.findById(order.getId()).orElseThrow().getPaymentStatus());
-        List<Object> results = race(() -> service.recordCodCollection(order.getId(), new BigDecimal("1350"), "synthetic-settlement", "first@example.test"),
-                () -> service.recordCodCollection(order.getId(), new BigDecimal("1350"), "synthetic-settlement", "second@example.test"));
+        List<Object> results = race(() -> service.recordCodCollection(order.getId(), new BigDecimal("1400"), "synthetic-settlement", "first@example.test"),
+                () -> service.recordCodCollection(order.getId(), new BigDecimal("1400"), "synthetic-settlement", "second@example.test"));
         assertTrue(results.stream().allMatch(Order.class::isInstance)); Order collected = orders.findById(order.getId()).orElseThrow();
         assertEquals("PAID", collected.getPaymentStatus()); assertEquals("synthetic-settlement", collected.getCodCollectionReference());
         assertNotNull(collected.getCodCollectedAt()); assertTrue(Set.of("first@example.test", "second@example.test").contains(collected.getCodCollectedBy()));
-        assertEquals(1350.0, collected.getTotalAmount()); assertEquals(350.0, collected.getDeliveryCharge());
+        assertEquals(1400.0, collected.getTotalAmount()); assertEquals(400.0, collected.getDeliveryCharge());
     }
 
     @Test void merchandiseCouponNeverReducesShippingAndHistoryStaysUnchanged() {
-        Product product = product(10); DirectOrderRequestDTO request = request(product); request.setQuantity(3); request.setCouponCode("SAVE500"); request.setExpectedTotal(new BigDecimal("2850"));
+        Product product = product(10); DirectOrderRequestDTO request = request(product); request.setQuantity(3); request.setCouponCode("SAVE500"); request.setExpectedTotal(new BigDecimal("2900"));
         Order order = placement.placeDirect(UUID.randomUUID().toString(), request, null);
-        assertEquals(2850.0, order.getTotalAmount()); assertEquals(350.0, order.getDeliveryCharge()); assertEquals(500.0, order.getDiscountAmount());
+        assertEquals(2900.0, order.getTotalAmount()); assertEquals(400.0, order.getDeliveryCharge()); assertEquals(500.0, order.getDiscountAmount());
         Order history = orders.findById(900001L).orElseThrow(); assertEquals(1000.0, history.getTotalAmount()); assertEquals(0.0, history.getDeliveryCharge());
     }
 
@@ -303,10 +303,10 @@ class PostgresReleaseIntegrationTest {
         mvc.perform(get("/api/orders").header("Authorization", "Bearer " + token)).andExpect(status().isOk());
         Product product = product(3); String key = UUID.randomUUID().toString(); long before = orders.count();
         String body = "{\"productId\":" + product.getId() + ",\"quantity\":1,\"name\":\"Synthetic buyer\",\"phoneNumber\":\"test-phone\","
-                + "\"address\":\"Synthetic test address\",\"email\":\"guest@example.test\",\"paymentMethod\":\"COD\",\"expectedTotal\":1350.00}";
+                + "\"address\":\"Synthetic test address\",\"email\":\"guest@example.test\",\"paymentMethod\":\"COD\",\"expectedTotal\":1400.00}";
         for (int retry = 0; retry < 2; retry++) mvc.perform(post("/api/orders/direct").header("Idempotency-Key", key)
                 .contentType("application/json").content(body)).andExpect(status().isOk())
-                .andExpect(jsonPath("$.deliveryCharge").value(350)).andExpect(jsonPath("$.totalAmount").value(1350))
+                .andExpect(jsonPath("$.deliveryCharge").value(400)).andExpect(jsonPath("$.totalAmount").value(1400))
                 .andExpect(jsonPath("$.paymentStatus").value("PENDING_COD"));
         assertEquals(before + 1, orders.count()); assertEquals(2, products.findById(product.getId()).orElseThrow().getStockQuantity());
         mvc.perform(post("/api/orders/direct").header("Idempotency-Key", UUID.randomUUID().toString()).contentType("application/json")
@@ -324,7 +324,7 @@ class PostgresReleaseIntegrationTest {
         mvc.perform(patch("/api/orders/" + order.getId() + "/status").param("status", "SHIPPED")
                 .header("Authorization", bearer(admin)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("SHIPPED"))
-                .andExpect(jsonPath("$.deliveryCharge").value(350))
+                .andExpect(jsonPath("$.deliveryCharge").value(400))
                 .andExpect(jsonPath("$.orderItems").doesNotExist());
         mvc.perform(get("/api/orders/" + order.getId()).header("Authorization", bearer(customer)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.id").value(order.getId()))

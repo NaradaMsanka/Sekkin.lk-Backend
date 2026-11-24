@@ -34,7 +34,7 @@ class OrderLifecycleSafetyTest {
         request.setExpectedTotal(new BigDecimal("1000"));
         ResponseStatusException changed = assertThrows(ResponseStatusException.class, () -> service.createDirectOrder(request, null));
         assertEquals(409, changed.getStatusCode().value()); assertEquals(3, p.getStockQuantity()); verifyNoInteractions(orders);
-        request.setExpectedTotal(new BigDecimal("1350")); when(orders.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
+        request.setExpectedTotal(new BigDecimal("1400")); when(orders.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
         Order created = service.createDirectOrder(request, null);
         assertEquals("PENDING", created.getStatus()); assertEquals("PENDING_COD", created.getPaymentStatus());
         assertTrue(created.getInventoryReserved()); assertNull(created.getAcceptedAt()); assertEquals(2, p.getStockQuantity());

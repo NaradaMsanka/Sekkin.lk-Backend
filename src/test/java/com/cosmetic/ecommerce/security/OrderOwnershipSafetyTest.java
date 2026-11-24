@@ -41,7 +41,7 @@ class OrderOwnershipSafetyTest {
     @Test void guestCannotClaimAnAccountBySubmittingItsEmail() {
         Order result = service.createDirectOrder(request(), null);
         assertNull(result.getUser()); assertEquals("victim@example.test", result.getCustomerEmail());
-        assertEquals(350.0, result.getDeliveryCharge()); assertEquals(1350.0, result.getTotalAmount());
+        assertEquals(400.0, result.getDeliveryCharge()); assertEquals(1400.0, result.getTotalAmount());
         assertEquals("PENDING_COD", result.getPaymentStatus()); verifyNoInteractions(users);
     }
 

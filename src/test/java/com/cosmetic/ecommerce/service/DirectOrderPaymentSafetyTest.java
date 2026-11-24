@@ -59,8 +59,8 @@ class DirectOrderPaymentSafetyTest {
         DirectOrderRequestDTO request = request(" cod "); request.setCouponCode("GLOW10");
         Order order = service.createDirectOrder(request, null);
         assertEquals("COD", order.getPaymentMethod()); assertEquals("PENDING_COD", order.getPaymentStatus());
-        assertEquals("PENDING", order.getStatus()); assertEquals(350.0, order.getDeliveryCharge());
-        assertEquals(3950.0, order.getTotalAmount()); assertEquals(3, product.getStockQuantity());
+        assertEquals("PENDING", order.getStatus()); assertEquals(400.0, order.getDeliveryCharge());
+        assertEquals(4000.0, order.getTotalAmount()); assertEquals(3, product.getStockQuantity());
         assertEquals(2, order.getOrderItems().getFirst().getQuantity());
         verify(orders).saveAndFlush(order);
     }
