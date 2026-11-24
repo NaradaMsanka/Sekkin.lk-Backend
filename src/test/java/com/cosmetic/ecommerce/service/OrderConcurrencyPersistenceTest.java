@@ -158,7 +158,27 @@ class OrderConcurrencyPersistenceTest {
         Order first = placement.placeCart(key, request, user.getEmail()); Order replay = placement.placeCart(key, request, user.getEmail());
         assertEquals(first.getId(), replay.getId()); assertEquals(1, products.findById(product.getId()).orElseThrow().getStockQuantity());
         assertEquals("test phone", first.getCustomerPhone()); assertEquals(user.getEmail(), first.getCustomerEmail());
+        assertEquals(user.getName(), first.getCustomerName()); assertNull(first.getPostalCode());
         assertEquals(0, tx(() -> carts.findByUserEmail(user.getEmail()).orElseThrow().getItems().size()));
+    }
+
+    @Test void cartSavesEnteredDeliveryDetailsAndKeepsAccountOwnership() {
+        User user = account(); Product product = product(2); CartOrderRequestDTO request = cartRequest(user, product);
+        request.setCustomerName("Delivery recipient"); request.setCustomerEmail("recipient@example.test");
+        request.setPostalCode("00100"); request.setShippingAddress("12 Test Street, Colombo");
+        String key = UUID.randomUUID().toString(); Order first = placement.placeCart(key, request, user.getEmail());
+        Order saved = orders.findById(first.getId()).orElseThrow();
+        assertEquals("Delivery recipient", saved.getCustomerName()); assertEquals("recipient@example.test", saved.getCustomerEmail());
+        assertEquals("12 Test Street, Colombo", saved.getShippingAddress()); assertEquals("00100", saved.getPostalCode());
+        assertEquals(user.getId(), tx(() -> orders.findById(first.getId()).orElseThrow().getUser().getId()));
+        assertEquals(first.getId(), placement.placeCart(key, request, user.getEmail()).getId());
+        request.setCustomerName("Changed recipient");
+        assertEquals(409, assertThrows(ResponseStatusException.class, () -> placement.placeCart(key, request, user.getEmail())).getStatusCode().value());
+        request.setCustomerName("Delivery recipient"); request.setCustomerEmail("changed@example.test");
+        assertEquals(409, assertThrows(ResponseStatusException.class, () -> placement.placeCart(key, request, user.getEmail())).getStatusCode().value());
+        request.setCustomerEmail("recipient@example.test"); request.setPostalCode("00200");
+        assertEquals(409, assertThrows(ResponseStatusException.class, () -> placement.placeCart(key, request, user.getEmail())).getStatusCode().value());
+        assertEquals(1, products.findById(product.getId()).orElseThrow().getStockQuantity());
     }
 
     @Test void changedCartWithTheSamePriceNeedsFreshConsent() {
