@@ -84,15 +84,14 @@ public class OrderService {
 
     @Transactional
     public Order createDirectOrder(DirectOrderRequestDTO request, String email, String keyHash, String fingerprint) {
+        if (email == null || email.isBlank() || "anonymousUser".equals(email))
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sign in required");
         String method = request.getPaymentMethod() == null ? "" : request.getPaymentMethod().trim().toUpperCase(Locale.ROOT);
         if (!"COD".equals(method)) throw bad("Online payments are not enabled. Use cash on delivery.");
         if (request.getProductId() == null) throw bad("Product ID is required");
-        User account = null;
-        if (email != null && !email.isBlank() && !"anonymousUser".equals(email)) {
-            account = userRepository.findByEmailForUpdate(email);
-            if (account == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Account unavailable");
-        }
-        // Guest contact email never establishes ownership of an existing account.
+        User account = userRepository.findByEmailForUpdate(email);
+        if (account == null || !account.isEnabled()) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Account unavailable");
+        // Ownership always comes from the signed-in account, never the contact email in the request.
         Product product = lockProducts(List.of(request.getProductId())).get(request.getProductId());
         List<OrderPricing.Line> lines = List.of(new OrderPricing.Line(product, request.getQuantity()));
         OrderPricing.Totals totals = priceAndValidateStock(lines, request.getCouponCode());

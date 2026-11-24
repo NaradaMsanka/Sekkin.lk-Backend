@@ -42,9 +42,9 @@ class OrderShippingPersistenceTest {
         DirectOrderRequestDTO request = new DirectOrderRequestDTO(); request.setProductId(product.getId());
         request.setQuantity(2); request.setPaymentMethod("COD"); request.setCouponCode("SAVE500");
         request.setEmail("fixture@example.test"); request.setAddress("Test address");
-        Order direct = service.createDirectOrder(request, null);
         User user = new User(); user.setName("Fixture"); user.setEmail("cart@example.test");
         user.setPassword("synthetic-test-only"); user.setRole("USER"); user = users.saveAndFlush(user);
+        Order direct = service.createDirectOrder(request, user.getEmail());
         Cart cart = new Cart(); cart.setUser(user); CartItem item = new CartItem();
         item.setProduct(product); item.setQuantity(2); cart.getItems().add(item);
         when(carts.getCart("cart@example.test")).thenReturn(cart);

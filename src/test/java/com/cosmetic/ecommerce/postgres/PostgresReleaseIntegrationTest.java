@@ -96,6 +96,8 @@ class PostgresReleaseIntegrationTest {
     @Autowired AccountSecurityService accounts; @Autowired PlatformTransactionManager manager;
     @Autowired PasswordResetService passwordResets;
     @Autowired JwtUtil jwt; @Autowired PasswordEncoder passwords; @Autowired MockMvc mvc; @Autowired JdbcTemplate jdbc;
+    private User checkoutUser;
+    @org.junit.jupiter.api.BeforeEach void signInCheckoutCustomer() { checkoutUser = user("USER"); }
 
     private <T> T transaction(java.util.function.Supplier<T> action) { return new TransactionTemplate(manager).execute(status -> action.get()); }
     private Product product(int stock) {
@@ -143,8 +145,8 @@ class PostgresReleaseIntegrationTest {
 
     @RepeatedTest(3) void actualPostgresqlRowLocksPreventOversellingTheFinalUnit() throws Exception {
         Product product = product(1); long before = orders.count();
-        List<Object> results = race(() -> placement.placeDirect(UUID.randomUUID().toString(), request(product), null),
-                () -> placement.placeDirect(UUID.randomUUID().toString(), request(product), null));
+        List<Object> results = race(() -> placement.placeDirect(UUID.randomUUID().toString(), request(product), checkoutUser.getEmail()),
+                () -> placement.placeDirect(UUID.randomUUID().toString(), request(product), checkoutUser.getEmail()));
         assertEquals(1, results.stream().filter(Order.class::isInstance).count());
         assertEquals(1, results.stream().filter(ResponseStatusException.class::isInstance).count());
         assertEquals(before + 1, orders.count()); assertEquals(0, products.findById(product.getId()).orElseThrow().getStockQuantity());
@@ -153,16 +155,16 @@ class PostgresReleaseIntegrationTest {
     @ParameterizedTest @ValueSource(ints = {1, 2})
     void actualUniqueConstraintRollbackReplaysOneOrderAndReservesOnce(int stock) throws Exception {
         Product product = product(stock); String key = UUID.randomUUID().toString(); long before = orders.count();
-        List<Object> results = race(() -> placement.placeDirect(key, request(product), null), () -> placement.placeDirect(key, request(product), null));
+        List<Object> results = race(() -> placement.placeDirect(key, request(product), checkoutUser.getEmail()), () -> placement.placeDirect(key, request(product), checkoutUser.getEmail()));
         assertTrue(results.stream().allMatch(Order.class::isInstance)); assertEquals(((Order) results.get(0)).getId(), ((Order) results.get(1)).getId());
         assertEquals(before + 1, orders.count()); assertEquals(stock - 1, products.findById(product.getId()).orElseThrow().getStockQuantity());
         transaction(() -> { Product changed = products.findByIdForUpdate(product.getId()).orElseThrow(); changed.setPrice(new BigDecimal("2000")); return products.save(changed); });
-        assertEquals(1400.0, placement.placeDirect(key, request(product), null).getTotalAmount());
+        assertEquals(1400.0, placement.placeDirect(key, request(product), checkoutUser.getEmail()).getTotalAmount());
         DirectOrderRequestDTO changed = request(product); changed.setAddress("Different synthetic address");
-        assertEquals(409, assertThrows(ResponseStatusException.class, () -> placement.placeDirect(key, changed, null)).getStatusCode().value());
+        assertEquals(409, assertThrows(ResponseStatusException.class, () -> placement.placeDirect(key, changed, checkoutUser.getEmail())).getStatusCode().value());
     }
 
-    @Test void cartRetriesAndGuestOwnershipAreSafeOnPostgresql() throws Exception {
+    @Test void cartRetriesAndAuthenticatedOwnershipAreSafeOnPostgresql() throws Exception {
         User user = user("USER"); Product product = product(4); carts.addProductToCart(user.getEmail(), product.getId(), 1);
         CartOrderRequestDTO request = new CartOrderRequestDTO(); request.setShippingAddress("Synthetic cart address");
         request.setCustomerPhone("test-only-phone"); request.setExpectedTotal(new BigDecimal("1400.00"));
@@ -170,20 +172,21 @@ class PostgresReleaseIntegrationTest {
         List<Object> results = race(() -> placement.placeCart(key, request, user.getEmail()), () -> placement.placeCart(key, request, user.getEmail()));
         assertTrue(results.stream().allMatch(Order.class::isInstance)); assertEquals(((Order) results.get(0)).getId(), ((Order) results.get(1)).getId());
         assertEquals(3, products.findById(product.getId()).orElseThrow().getStockQuantity()); assertTrue(carts.getCart(user.getEmail()).getItems().isEmpty());
-        DirectOrderRequestDTO guestRequest = request(product); guestRequest.setEmail(user.getEmail());
-        Order guest = placement.placeDirect(UUID.randomUUID().toString(), guestRequest, null); assertNull(guest.getUser());
-        assertEquals(403, assertThrows(ResponseStatusException.class, () -> service.getOrderById(guest.getId(), user.getEmail())).getStatusCode().value());
+        DirectOrderRequestDTO contactRequest = request(product); contactRequest.setEmail(user.getEmail());
+        Order separateAccount = placement.placeDirect(UUID.randomUUID().toString(), contactRequest, checkoutUser.getEmail());
+        assertEquals(checkoutUser.getId(), transaction(() -> orders.findById(separateAccount.getId()).orElseThrow().getUser().getId()));
+        assertEquals(403, assertThrows(ResponseStatusException.class, () -> service.getOrderById(separateAccount.getId(), user.getEmail())).getStatusCode().value());
     }
 
     @Test void cancellationRestoresOnlyOneKnownReservationOnPostgresql() throws Exception {
-        Product product = product(2); Order order = placement.placeDirect(UUID.randomUUID().toString(), request(product), null);
+        Product product = product(2); Order order = placement.placeDirect(UUID.randomUUID().toString(), request(product), checkoutUser.getEmail());
         List<Object> results = race(() -> service.updateOrderStatus(order.getId(), "CANCELLED"), () -> service.updateOrderStatus(order.getId(), "CANCELLED"));
         assertTrue(results.stream().allMatch(Order.class::isInstance)); assertEquals(2, products.findById(product.getId()).orElseThrow().getStockQuantity());
         assertFalse(orders.findById(order.getId()).orElseThrow().getInventoryReserved());
     }
 
     @Test void codEvidenceIsRequiredAndConcurrentCollectionKeepsOneAudit() throws Exception {
-        Product product = product(2); Order order = placement.placeDirect(UUID.randomUUID().toString(), request(product), null);
+        Product product = product(2); Order order = placement.placeDirect(UUID.randomUUID().toString(), request(product), checkoutUser.getEmail());
         assertThrows(ResponseStatusException.class, () -> service.recordCodCollection(order.getId(), new BigDecimal("1400"), "synthetic-settlement", "operator@example.test"));
         service.acceptOrder(order.getId(), "synthetic-confirmation", "operator@example.test");
         service.updateOrderStatus(order.getId(), "SHIPPED"); service.updateOrderStatus(order.getId(), "DELIVERED");
@@ -198,7 +201,7 @@ class PostgresReleaseIntegrationTest {
 
     @Test void merchandiseCouponNeverReducesShippingAndHistoryStaysUnchanged() {
         Product product = product(10); DirectOrderRequestDTO request = request(product); request.setQuantity(3); request.setCouponCode("SAVE500"); request.setExpectedTotal(new BigDecimal("2900"));
-        Order order = placement.placeDirect(UUID.randomUUID().toString(), request, null);
+        Order order = placement.placeDirect(UUID.randomUUID().toString(), request, checkoutUser.getEmail());
         assertEquals(2900.0, order.getTotalAmount()); assertEquals(400.0, order.getDeliveryCharge()); assertEquals(500.0, order.getDiscountAmount());
         Order history = orders.findById(900001L).orElseThrow(); assertEquals(1000.0, history.getTotalAmount()); assertEquals(0.0, history.getDeliveryCharge());
     }
@@ -293,7 +296,7 @@ class PostgresReleaseIntegrationTest {
                 .andExpect(status().isForbidden());
     }
 
-    @Test void realLoginAndPublicCodHttpCreationWorkWithoutAnyCardCollection() throws Exception {
+    @Test void realLoginIsRequiredForCodHttpCreationWithoutAnyCardCollection() throws Exception {
         User customer = user("USER");
         var login = mvc.perform(post("/api/auth/login").contentType("application/json")
                 .content("{\"email\":\"" + customer.getEmail() + "\",\"password\":\"synthetic-valid-test-password\"}"))
@@ -304,12 +307,15 @@ class PostgresReleaseIntegrationTest {
         Product product = product(3); String key = UUID.randomUUID().toString(); long before = orders.count();
         String body = "{\"productId\":" + product.getId() + ",\"quantity\":1,\"name\":\"Synthetic buyer\",\"phoneNumber\":\"test-phone\","
                 + "\"address\":\"Synthetic test address\",\"email\":\"guest@example.test\",\"paymentMethod\":\"COD\",\"expectedTotal\":1400.00}";
-        for (int retry = 0; retry < 2; retry++) mvc.perform(post("/api/orders/direct").header("Idempotency-Key", key)
+        mvc.perform(post("/api/orders/direct").header("Idempotency-Key", key).contentType("application/json").content(body))
+                .andExpect(status().isUnauthorized());
+        assertEquals(before, orders.count()); assertEquals(3, products.findById(product.getId()).orElseThrow().getStockQuantity());
+        for (int retry = 0; retry < 2; retry++) mvc.perform(post("/api/orders/direct").header("Authorization", "Bearer " + token).header("Idempotency-Key", key)
                 .contentType("application/json").content(body)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.deliveryCharge").value(400)).andExpect(jsonPath("$.totalAmount").value(1400))
                 .andExpect(jsonPath("$.paymentStatus").value("PENDING_COD"));
         assertEquals(before + 1, orders.count()); assertEquals(2, products.findById(product.getId()).orElseThrow().getStockQuantity());
-        mvc.perform(post("/api/orders/direct").header("Idempotency-Key", UUID.randomUUID().toString()).contentType("application/json")
+        mvc.perform(post("/api/orders/direct").header("Authorization", "Bearer " + token).header("Idempotency-Key", UUID.randomUUID().toString()).contentType("application/json")
                 .content(body.substring(0, body.length() - 1) + ",\"cardNumber\":\"synthetic-forbidden-card-data\"}"))
                 .andExpect(status().isBadRequest());
         assertEquals(before + 1, orders.count());

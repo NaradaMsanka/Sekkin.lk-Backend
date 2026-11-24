@@ -39,17 +39,32 @@ class OrderOwnershipSafetyTest {
     }
 
     @Test void guestCannotClaimAnAccountBySubmittingItsEmail() {
-        Order result = service.createDirectOrder(request(), null);
-        assertNull(result.getUser()); assertEquals("victim@example.test", result.getCustomerEmail());
-        assertEquals(400.0, result.getDeliveryCharge()); assertEquals(1400.0, result.getTotalAmount());
-        assertEquals("PENDING_COD", result.getPaymentStatus()); verifyNoInteractions(users);
+        DirectOrderRequestDTO request = new DirectOrderRequestDTO(); request.setEmail("victim@example.test");
+        for (String email : new String[]{null, "", " ", "anonymousUser"}) {
+            assertEquals(HttpStatus.UNAUTHORIZED, assertThrows(ResponseStatusException.class,
+                    () -> service.createDirectOrder(request, email)).getStatusCode());
+        }
+        verifyNoInteractions(users, products, orders, carts);
+    }
+
+    @Test void unavailableOrDisabledAccountCannotReserveStockOrCreateAnOrder() {
+        DirectOrderRequestDTO request = new DirectOrderRequestDTO(); request.setProductId(1L); request.setPaymentMethod("COD");
+        assertEquals(HttpStatus.UNAUTHORIZED, assertThrows(ResponseStatusException.class,
+                () -> service.createDirectOrder(request, "missing@example.test")).getStatusCode());
+        User disabled = new User(); disabled.setEnabled(false);
+        when(users.findByEmailForUpdate("disabled@example.test")).thenReturn(disabled);
+        assertEquals(HttpStatus.UNAUTHORIZED, assertThrows(ResponseStatusException.class,
+                () -> service.createDirectOrder(request, "disabled@example.test")).getStatusCode());
+        verifyNoInteractions(products, orders, carts);
     }
 
     @Test void signedInOrderUsesPrincipalRatherThanContactEmail() {
         User principal = new User(); principal.setEmail("owner@example.test");
         when(users.findByEmailForUpdate(principal.getEmail())).thenReturn(principal);
         Order result = service.createDirectOrder(request(), principal.getEmail());
-        assertSame(principal, result.getUser()); verify(users, never()).findByEmail("victim@example.test");
+        assertSame(principal, result.getUser()); assertEquals("victim@example.test", result.getCustomerEmail());
+        assertEquals(400.0, result.getDeliveryCharge()); assertEquals(1400.0, result.getTotalAmount());
+        verify(users, never()).findByEmailForUpdate("victim@example.test");
     }
 
     @Test void ownerCanReadStoredAmountsWithoutRepricing() {

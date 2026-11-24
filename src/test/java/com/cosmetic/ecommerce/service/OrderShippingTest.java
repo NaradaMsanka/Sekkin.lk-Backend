@@ -44,9 +44,14 @@ class OrderShippingTest {
         cart.getItems().add(item); return cart;
     }
     private DirectOrderRequestDTO direct(Product product, Integer quantity, String coupon) {
+        signedIn();
         DirectOrderRequestDTO request = new DirectOrderRequestDTO(); request.setProductId(product.getId());
         request.setQuantity(quantity); request.setPaymentMethod("COD"); request.setCouponCode(coupon);
         request.setEmail(email); request.setAddress("Test address"); return request;
+    }
+    private void signedIn() {
+        User account = new User(); account.setEmail(email);
+        when(users.findByEmailForUpdate(email)).thenReturn(account);
     }
     private void saveOrders() { when(orders.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0)); }
 
@@ -55,7 +60,7 @@ class OrderShippingTest {
         Product product = product(1, price); when(products.findByIdForUpdate(1L)).thenReturn(Optional.of(product));
         when(carts.getCart(email)).thenReturn(cart(product, 1)); saveOrders();
         Order normal = service.createOrder(email, "Test address");
-        Order direct = service.createDirectOrder(direct(product, 1, null), null);
+        Order direct = service.createDirectOrder(direct(product, 1, null), email);
         for (Order order : List.of(normal, direct)) {
             assertEquals(400.0, order.getDeliveryCharge()); assertEquals(expected, order.getTotalAmount());
             assertEquals("PENDING_COD", order.getPaymentStatus());
@@ -77,7 +82,7 @@ class OrderShippingTest {
         Product product = product(1, "2500"); when(products.findByIdForUpdate(1L)).thenReturn(Optional.of(product));
         when(carts.getCart(email)).thenReturn(cart(product, 2)); saveOrders();
         Order normal = service.createOrder(email, "Test address", coupon);
-        Order direct = service.createDirectOrder(direct(product, 2, coupon), null);
+        Order direct = service.createDirectOrder(direct(product, 2, coupon), email);
         assertEquals(expected, normal.getTotalAmount()); assertEquals(expected, direct.getTotalAmount());
         assertEquals(400.0, normal.getDeliveryCharge()); assertEquals(400.0, direct.getDeliveryCharge());
     }
@@ -85,7 +90,7 @@ class OrderShippingTest {
     @Test void productAndCouponSavingsAreNotSubtractedTwice() {
         Product product = product(1, "3000"); product.setDiscountPrice(new BigDecimal("2500"));
         when(products.findByIdForUpdate(1L)).thenReturn(Optional.of(product)); saveOrders();
-        Order order = service.createDirectOrder(direct(product, 2, "SAVE500"), null);
+        Order order = service.createDirectOrder(direct(product, 2, "SAVE500"), email);
         assertEquals(4900.0, order.getTotalAmount()); assertEquals(1500.0, order.getDiscountAmount());
         assertEquals(2500.0, order.getOrderItems().getFirst().getPrice());
     }
@@ -108,14 +113,14 @@ class OrderShippingTest {
         Product product = product(1, "1000"); when(products.findByIdForUpdate(1L)).thenReturn(Optional.of(product));
         when(carts.getCart(email)).thenReturn(cart(product, quantity));
         assertThrows(RuntimeException.class, () -> service.createOrder(email, "Test address"));
-        assertThrows(RuntimeException.class, () -> service.createDirectOrder(direct(product, quantity, null), null));
+        assertThrows(RuntimeException.class, () -> service.createDirectOrder(direct(product, quantity, null), email));
         verifyNoInteractions(orders); verify(products, never()).save(any());
     }
 
     @ParameterizedTest @ValueSource(strings = {"-1", "0", "0.004"})
     void invalidProductPriceIsRejectedWithoutStockChanges(String price) {
         Product product = product(1, price); when(products.findByIdForUpdate(1L)).thenReturn(Optional.of(product));
-        assertThrows(RuntimeException.class, () -> service.createDirectOrder(direct(product, 1, null), null));
+        assertThrows(RuntimeException.class, () -> service.createDirectOrder(direct(product, 1, null), email));
         assertEquals(100, product.getStockQuantity()); verifyNoInteractions(orders);
     }
 
@@ -149,8 +154,9 @@ class OrderShippingTest {
     }
 
     @Test void directHttpConfirmationMatchesStoredTotalsAndCouponBreakdown() throws Exception {
+        signedIn();
         Product product = product(1, "2500"); when(products.findByIdForUpdate(1L)).thenReturn(Optional.of(product)); saveOrders();
-        when(placement.placeDirect(any(), any(), any())).thenAnswer(call -> service.createDirectOrder(call.getArgument(1), call.getArgument(2)));
+        when(placement.placeDirect(any(), any(), any())).thenAnswer(call -> service.createDirectOrder(call.getArgument(1), email));
         var mvc = MockMvcBuilders.standaloneSetup(new OrderController(service, placement)).build();
         mvc.perform(post("/api/orders/direct").header("Idempotency-Key", UUID.randomUUID().toString()).contentType("application/json").content("{\"productId\":1,\"quantity\":2,\"name\":\"Fixture\",\"phoneNumber\":\"0000000000\",\"email\":\"fixture@example.test\",\"address\":\"Test\",\"paymentMethod\":\"COD\",\"couponCode\":\"SAVE500\",\"expectedTotal\":4900}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.deliveryCharge").value(400.0))
